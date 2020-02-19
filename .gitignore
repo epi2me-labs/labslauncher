@@ -1,0 +1,5 @@
+Epi2MeLabs-Launcher.spec
+__pycache__/
+build/
+dist/
+*.swp
