@@ -3,3 +3,7 @@ __pycache__/
 build/
 dist/
 *.swp
+*.deb
+deb-src/DEBIAN/md5sums
+md5sums
+tmp

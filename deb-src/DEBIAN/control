@@ -1,0 +1,9 @@
+Package: PROJECT
+Version: MAJOR.MINOR.SUB-PATCH~CODENAME
+Section: science
+Priority: optional
+Architecture: amd64
+Source: PROJECT
+Depends: 
+Maintainer: 
+Description: Epi2MeLabs Server Manager
