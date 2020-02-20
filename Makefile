@@ -1,15 +1,10 @@
+PROJECT  ?= ont-epi2melabs-launcher
 MAJOR    ?= 0
 MINOR    ?= 1
 SUB      ?= 0
 PATCH    ?= 0
-STREAM   ?= ""
 VERSION   ="$(MAJOR).$(MINOR).$(SUB)"
 CODENAME ?= $(shell awk -F= '/CODENAME/{print $$2}' /etc/lsb-release)
-ifeq "$(STREAM)" ""
-	PROJECT  ?= ont-epi2melabs-launcher
-else
-	PROJECT  ?= ont-epi2melabs-launcher-$(STREAM)
-endif
 DEB	  ="$(PROJECT)-$(MAJOR).$(MINOR).$(SUB)-$(PATCH)~$(CODENAME).deb"
 MD5SUM    = md5sum
 SEDI      = sed -i
@@ -23,13 +18,13 @@ venv: venv/bin/activate
 IN_VENV=. ./venv/bin/activate
 
 venv/bin/activate:
-	test -d venv || virtualenv venv --python=python3.6 --prompt "(build) "
+	test -d venv || virtualenv venv --python=python3 --prompt "(build) "
 	${IN_VENV} && pip install pip --upgrade
 	${IN_VENV} && pip install -r requirements.txt
 
 
 dist/Epi2MeLabs-Launcher: venv
-	${IN_VENV} && pyinstaller labslauncher.py --onefile -n Epi2MeLabs-Launcher --hidden-import docker
+	${IN_VENV} && pyinstaller labslauncher.py --onefile -n Epi2MeLabs-Launcher --hidden-import ctypes
 
 
 .PHONY: run
