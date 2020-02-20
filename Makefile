@@ -45,7 +45,9 @@ test:
 
 deb: clean dist/Epi2MeLabs-Launcher
 	mkdir -p deb-src/usr/local/bin
+	mkdir -p deb-src/usr/share/applications
 	cp dist/Epi2MeLabs-Launcher deb-src/usr/local/bin/
+	cp labslauncher.desktop deb-src/usr/share/applications
 	cp -rp deb-src/ tmp/
 	$(SEDI) "s/PROJECT/$(PROJECT)/g"   tmp/DEBIAN/control
 	$(SEDI) "s/MAJOR/$(MAJOR)/g"       tmp/DEBIAN/control
