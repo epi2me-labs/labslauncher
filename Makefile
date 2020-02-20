@@ -24,7 +24,7 @@ venv/bin/activate:
 
 
 dist/Epi2MeLabs-Launcher: venv
-	${IN_VENV} && pyinstaller labslauncher.py --onefile -n Epi2MeLabs-Launcher --hidden-import cython
+	${IN_VENV} && xvfb-run pyinstaller labslauncher.py --onefile -n Epi2MeLabs-Launcher --hidden-import cython
 
 
 .PHONY: run
