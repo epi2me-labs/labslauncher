@@ -1,7 +1,7 @@
 PROJECT  ?= ont-epi2melabs-launcher
 MAJOR    ?= 0
 MINOR    ?= 1
-SUB      ?= 0
+SUB      ?= 1
 PATCH    ?= 0
 VERSION   ="$(MAJOR).$(MINOR).$(SUB)"
 CODENAME ?= $(shell awk -F= '/CODENAME/{print $$2}' /etc/lsb-release)
