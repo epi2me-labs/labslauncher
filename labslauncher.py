@@ -1,10 +1,16 @@
-import docker
+#!/usr/bin/env python
+from threading import Thread
+from time import sleep
+import webbrowser
 
+import docker
 
 from kivy.core.window import Window
 Window.size = (400, 200)
 
 from kivy.app import App
+from kivy.properties import StringProperty
+from kivy.uix import actionbar
 from kivy.uix.button import Button
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
@@ -29,67 +35,87 @@ CONTAINERCMD=[
     "--ip=0.0.0.0",
     "--no-browser",
     "--notebook-dir=./work"]
+COLABLINK='https://colab.research.google.com/github/epi2me-labs/resources/blob/master/welcome.ipynb'
+
+
+class BoxRows(list):
+    def new_row(self):
+        r = BoxLayout()
+        self.append(r)
+        return r
+
+    @property
+    def layout(self):
+        layout = BoxLayout(orientation='vertical')
+        for r in self:
+            layout.add_widget(r)
+        return layout
 
 
 class HomeScreen(Screen):
-
+    cstatus = StringProperty('unknown')
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
         self.app = App.get_running_app()
 
-        layout = BoxLayout(orientation='vertical')
-        row0 = BoxLayout(height=50)
-        row1 = BoxLayout()
+        self.bind(cstatus=self.on_status_change)
 
+        rows = BoxRows()
+
+        row = rows.new_row()
         self.containerlbl = Label()
-        self.set_status_label()
-        row0.add_widget(self.containerlbl)
+        row.add_widget(self.containerlbl)
 
-        startbtn = Button(text='Start', width=50)
-        startbtn.bind(on_press=self.goto_start_settings)
-        row1.add_widget(startbtn)
+        row = rows.new_row()
+        self.startbtn = Button(text='Start', width=50)
+        self.startbtn.bind(on_press=self.goto_start_settings)
+        row.add_widget(self.startbtn)
 
-        stopbtn = Button(text='Stop', width=50)
-        stopbtn.bind(on_release=self.stop_server)
-        row1.add_widget(stopbtn)
+        self.stopbtn = Button(text='Stop', width=50)
+        self.stopbtn.bind(on_release=self.app.clear_container)
+        row.add_widget(self.stopbtn)
 
-        layout.add_widget(row0)
-        layout.add_widget(row1)
-        self.add_widget(layout)
+        row = rows.new_row()
+        helptext = Label(
+            text="Navigate to the [color=2a7cdf][ref=click]Welcome page[/ref][/color] to get started.",
+            markup=True)
+        helptext.bind(on_ref_press=self.open_colab)
+        row.add_widget(helptext)
+
+        self.add_widget(rows.layout)
         self.height=100
+
+    def open_colab(self, *args):
+        webbrowser.open(COLABLINK)
 
     def goto_start_settings(self, *args):
         self.manager.transition.direction = 'left'
         self.manager.current = 'start'
 
+    def on_status_change(self, *args):
+        self.containerlbl.text = "Server status: {}.".format(self.cstatus)
 
-    def stop_server(self, *args):
-        cont = self.app.container
-        if cont is not None:
-            self.set_status_label("Stopping")
-            cont.kill()
-            self.set_status_label("Removing")
-            cont.remove()
-            self.set_status_label()
-        self.set_status_label()
-
-    def set_status_label(self, status=None):
-        if status is None:
-            status = 'not running'
-            if self.app.container is not None:
-                status = self.app.container.status
-        self.containerlbl.text = "Server status: {}.".format(status)
-
+        self.startbtn.text = "Start"
+        if self.cstatus in "running":
+            self.startbtn.disabled = True
+            self.stopbtn.disabled = False
+        elif self.cstatus in ("created", "exited", "paused", "dead", "inactive"):
+            self.startbtn.disabled = False
+            self.stopbtn.disabled = True
+            if self.cstatus != "inactive":
+                self.startbtn.text = "Restart"
 
 
 class StartScreen(Screen):
-    
+    cstatus = StringProperty('unknown')
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
         self.app = App.get_running_app()
+        self.bind(cstatus=self.on_status_change)
 
         rows = list()
         def new_row():
@@ -117,9 +143,9 @@ class StartScreen(Screen):
         row.add_widget(self.port_input)
 
         row = new_row()
-        startbtn = Button(text='Start')
-        startbtn.bind(on_release=self.start_server)
-        row.add_widget(startbtn)
+        self.startbtn = Button(text='Start')
+        self.startbtn.bind(on_release=self.start_server)
+        row.add_widget(self.startbtn)
 
         stopbtn = Button(text='Back', width=50)
         stopbtn.bind(on_release=self.goto_home)
@@ -130,47 +156,34 @@ class StartScreen(Screen):
             layout.add_widget(r)
         self.add_widget(layout)
 
+    def on_status_change(self, *args):
+        msg = ""
+        start_text = "Start"
+        if self.cstatus == "inactive":
+            pass
+        elif self.cstatus in ("created", "exited"):
+            msg = " (last attempt failed)"
+            start_text = "Restart"
+
+        self.startbtn.text = start_text
+        self.containerlbl.text = 'Start server{}'.format(msg)
+
+
     def goto_home(self, *args):
         self.manager.transition.direction = 'right'
         self.manager.current = 'home'
 
     def start_server(self, *args):
-        def _start():
-            try:
-                CMD = CONTAINERCMD + [
-                    "--NotebookApp.token={}".format(self.token_input.text)]
-                self.app.docker.containers.run(
-                    CONTAINER,
-                    CMD,
-                    detach=True,
-                    ports={PORTBIND:int(self.port_input.text)},
-                    environment=['JUPYTER_ENABLE_LAB=yes'],
-                    volumes={
-                        self.datamount_input.text:{
-                            'bind':DATABIND, 'mode':'rw'}},
-                    name=SERVER_NAME)
-            except Exception as e:
-                return 1
-            else:
-                return 0
-
-        cont = self.app.container
-        status = None
-        if cont is None:
-            status = _start()
-        elif cont.status in ("created", "exited"):
-            cont.remove()
-            status = _start()
-
-        if status == 0:
-            self.app.sm.get_screen('home').set_status_label()
+        self.app.start_container(
+            self.datamount_input.text, self.token_input.text,
+            int(self.port_input.text))
+        if self.cstatus == "running":
             self.goto_home()
-        else:
-            self.containerlbl.text = 'Start server (last attempt failed)'
 
 
 class LabsLauncherApp(App):
 
+    cstatus = StringProperty('unknown')
 
     def __init__(self, *args, **kwargs):
         super().__init__(**kwargs)
@@ -180,6 +193,11 @@ class LabsLauncherApp(App):
         self.sm = ScreenManager()
         self.sm.add_widget(HomeScreen(name='home'))
         self.sm.add_widget(StartScreen(name='start'))
+
+        for screen in ('home', 'start'):
+            self.bind(cstatus=self.sm.get_screen(screen).setter('cstatus'))
+        self.set_status()
+
         return self.sm
 
     @property
@@ -188,6 +206,46 @@ class LabsLauncherApp(App):
             if cont.name == SERVER_NAME:
                 return cont
         return None
+
+    def set_status(self):
+        c = self.container
+        new_status = 'inactive'
+        if c is not None:
+            new_status = c.status
+        if new_status != self.cstatus:
+            self.cstatus = new_status
+
+    def clear_container(self, *args):
+        cont = self.container
+        if cont is not None:
+            if cont.status == "running":
+                cont.kill()
+            cont.remove()
+        self.set_status()
+
+    def start_container(self, mount, token, port):
+        self.clear_container()
+
+        CMD = CONTAINERCMD + [
+            "--NotebookApp.token={}".format(token)]
+
+        try:
+            self.docker.containers.run(
+                CONTAINER,
+                CMD,
+                detach=True,
+                ports={PORTBIND:int(port)},
+                environment=['JUPYTER_ENABLE_LAB=yes'],
+                volumes={
+                    mount:{
+                        'bind':DATABIND, 'mode':'rw'}},
+                name=SERVER_NAME)
+        except Exception as e:
+            #TODO: better feedback on failure
+            pass
+
+        self.set_status()
+
 
 
 if __name__ == '__main__':
