@@ -30,7 +30,6 @@ CONTAINERCMD=[
     "start-notebook.sh",
     "--NotebookApp.allow_origin='https://colab.research.google.com'",
     "--NotebookApp.disable_check_xsrf=True",
-    "--port={}".format(PORTBIND),
     "--NotebookApp.port_retries=0",
     "--ip=0.0.0.0",
     "--no-browser",
@@ -226,15 +225,18 @@ class LabsLauncherApp(App):
     def start_container(self, mount, token, port):
         self.clear_container()
 
+        # colab required the port in the container to be equal
         CMD = CONTAINERCMD + [
-            "--NotebookApp.token={}".format(token)]
+            "--NotebookApp.token={}".format(token),
+            "--port={}".format(port),
+            ]
 
         try:
             self.docker.containers.run(
                 CONTAINER,
                 CMD,
                 detach=True,
-                ports={PORTBIND:int(port)},
+                ports={int(port):int(port)},
                 environment=['JUPYTER_ENABLE_LAB=yes'],
                 volumes={
                     mount:{
