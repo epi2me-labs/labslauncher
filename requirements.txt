@@ -6,7 +6,7 @@ docutils==0.16
 idna==2.9
 Kivy==1.11.1
 Kivy-Garden==0.1.4
-pkg-resources==0.0.0
+#pkg-resources
 pyenchant==2.0.0
 Pygments==2.5.2
 PyInstaller==3.6
