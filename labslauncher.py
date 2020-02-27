@@ -1,32 +1,25 @@
 #!/usr/bin/env python
-from threading import Thread
-from time import sleep
 import webbrowser
 
 import docker
-
-from kivy.core.window import Window
-Window.size = (400, 200)
-
 from kivy.app import App
+from kivy.core.window import Window
 from kivy.properties import StringProperty
-from kivy.uix import actionbar
-from kivy.uix.button import Button
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.floatlayout import FloatLayout
+from kivy.uix.button import Button
 from kivy.uix.label import Label
-from kivy.uix.screenmanager import ScreenManager, Screen
+from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.uix.textinput import TextInput
+import pyperclip
 
-
-CONTAINER='ontresearch/nanolabs-notebook'
-SERVER_NAME='Epi2Me-Labs-Server'
-DATAMOUNT='/data/'
-DATABIND='/home/jovyan/work'
-PORTHOST=8888
-PORTBIND=8888
-LABSTOKEN='epi2me'
-CONTAINERCMD=[
+CONTAINER = 'ontresearch/nanolabs-notebook'
+SERVER_NAME = 'Epi2Me-Labs-Server'
+DATAMOUNT = '/data/'
+DATABIND = '/home/jovyan/work'
+PORTHOST = 8888
+PORTBIND = 8888
+LABSTOKEN = 'epi2me'
+CONTAINERCMD = [
     "start-notebook.sh",
     "--NotebookApp.allow_origin='https://colab.research.google.com'",
     "--NotebookApp.disable_check_xsrf=True",
@@ -34,7 +27,10 @@ CONTAINERCMD=[
     "--ip=0.0.0.0",
     "--no-browser",
     "--notebook-dir=./work"]
-COLABLINK='https://colab.research.google.com/github/epi2me-labs/resources/blob/master/welcome.ipynb'
+COLABLINK = 'https://colab.research.google.com/github/epi2me-labs/resources/blob/master/welcome.ipynb'
+
+
+Window.size = (400, 200)
 
 
 class BoxRows(list):
@@ -83,8 +79,20 @@ class HomeScreen(Screen):
         helptext.bind(on_ref_press=self.open_colab)
         row.add_widget(helptext)
 
+        def copy_button_press(button):
+            button.text = button.text.replace("Copy", "Copied")
+
+        row = rows.new_row()
+        self.copy_button = Button(text=self.app.local_address, width=50)
+        self.copy_button.bind(on_press=self.copy_local_address_to_clipboard)
+        self.copy_button.bind(on_release=copy_button_press)
+        row.add_widget(self.copy_button)
+
         self.add_widget(rows.layout)
-        self.height=100
+        self.height = 100
+
+    def copy_local_address_to_clipboard(self, *args):
+        pyperclip.copy(self.app.local_address)
 
     def open_colab(self, *args):
         webbrowser.open(COLABLINK)
@@ -100,9 +108,16 @@ class HomeScreen(Screen):
         if self.cstatus in "running":
             self.startbtn.disabled = True
             self.stopbtn.disabled = False
+            if self.app.local_address == "Local address unavailable":
+                self.copy_button.disabled = True
+                self.copy_button.text = self.app.local_address
+            else:
+                self.copy_button.disabled = False
+                self.copy_button.text = "Copy \"{}\" to clipboard".format(self.app.local_address)
         elif self.cstatus in ("created", "exited", "paused", "dead", "inactive"):
             self.startbtn.disabled = False
             self.stopbtn.disabled = True
+            self.copy_button.disabled = True
             if self.cstatus != "inactive":
                 self.startbtn.text = "Restart"
 
@@ -117,6 +132,7 @@ class StartScreen(Screen):
         self.bind(cstatus=self.on_status_change)
 
         rows = list()
+
         def new_row():
             r = BoxLayout()
             rows.append(r)
@@ -151,8 +167,8 @@ class StartScreen(Screen):
         row.add_widget(stopbtn)
 
         layout = BoxLayout(orientation='vertical')
-        for r in rows:
-            layout.add_widget(r)
+        for single_row in rows:
+            layout.add_widget(single_row)
         self.add_widget(layout)
 
     def on_status_change(self, *args):
@@ -166,7 +182,6 @@ class StartScreen(Screen):
 
         self.startbtn.text = start_text
         self.containerlbl.text = 'Start server{}'.format(msg)
-
 
     def goto_home(self, *args):
         self.manager.transition.direction = 'right'
@@ -183,10 +198,19 @@ class StartScreen(Screen):
 class LabsLauncherApp(App):
 
     cstatus = StringProperty('unknown')
+    _local_address = "Local address unavailable"
 
     def __init__(self, *args, **kwargs):
         super().__init__(**kwargs)
         self.docker = docker.from_env()
+
+    @property
+    def local_address(self):
+        return self._local_address
+
+    def set_local_address(self, port=PORTBIND, token=LABSTOKEN):
+        local_address_format = "http://localhost:{}?token={}"
+        self._local_address = local_address_format.format(port, token)
 
     def build(self):
         self.sm = ScreenManager()
@@ -239,9 +263,10 @@ class LabsLauncherApp(App):
                 ports={int(port):int(port)},
                 environment=['JUPYTER_ENABLE_LAB=yes'],
                 volumes={
-                    mount:{
-                        'bind':DATABIND, 'mode':'rw'}},
+                    mount: {
+                        'bind': DATABIND, 'mode': 'rw'}},
                 name=SERVER_NAME)
+            self.set_local_address(port=port, token=token)
         except Exception as e:
             #TODO: better feedback on failure
             pass

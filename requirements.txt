@@ -10,6 +10,7 @@ Kivy-Garden==0.1.4
 pyenchant==2.0.0
 Pygments==2.5.2
 PyInstaller==3.6
+pyperclip==1.7.0
 requests==2.23.0
 six==1.14.0
 urllib3==1.25.8
