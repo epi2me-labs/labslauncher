@@ -5,5 +5,5 @@ Priority: optional
 Architecture: amd64
 Source: PROJECT
 Depends: 
-Maintainer: 
+Maintainer: Oxford Nanopore Technologies
 Description: Epi2MeLabs Server Manager
