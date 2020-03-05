@@ -269,9 +269,14 @@ class LabsLauncherApp(App):
     def clear_container(self, *args):
         cont = self.container
         if cont is not None:
-            if cont.status == "running":
-                cont.kill()
-            cont.remove()
+            cont.remove(force=True)
+            try:
+                cont.wait(condition='removed')
+            except docker.errors.NotFound:
+                # we were already successful
+                pass
+        self.docker.containers.prune()
+        self.docker.images.prune()
         self.set_status()
 
     def start_container(self, mount, token, port):
@@ -287,6 +292,7 @@ class LabsLauncherApp(App):
             self.docker.containers.run(
                 CONTAINER,
                 CMD,
+                auto_remove=True,
                 detach=True,
                 ports={int(port):int(port)},
                 environment=['JUPYTER_ENABLE_LAB=yes'],
