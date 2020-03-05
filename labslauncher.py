@@ -1,32 +1,27 @@
 #!/usr/bin/env python
+import time
 from threading import Thread
-from time import sleep
 import webbrowser
 
 import docker
-
-from kivy.core.window import Window
-Window.size = (400, 200)
-
 from kivy.app import App
+from kivy.core.window import Window
 from kivy.properties import StringProperty
-from kivy.uix import actionbar
-from kivy.uix.button import Button
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.floatlayout import FloatLayout
+from kivy.uix.button import Button
 from kivy.uix.label import Label
-from kivy.uix.screenmanager import ScreenManager, Screen
+from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.uix.textinput import TextInput
+import pyperclip
 
-
-CONTAINER='ontresearch/nanolabs-notebook'
-SERVER_NAME='Epi2Me-Labs-Server'
-DATAMOUNT='/data/'
-DATABIND='/home/jovyan/work'
-PORTHOST=8888
-PORTBIND=8888
-LABSTOKEN='epi2me'
-CONTAINERCMD=[
+CONTAINER = 'ontresearch/nanolabs-notebook'
+SERVER_NAME = 'Epi2Me-Labs-Server'
+DATAMOUNT = '/data/'
+DATABIND = '/home/jovyan/work'
+PORTHOST = 8888
+PORTBIND = 8888
+LABSTOKEN = 'epi2me'
+CONTAINERCMD = [
     "start-notebook.sh",
     "--NotebookApp.allow_origin='https://colab.research.google.com'",
     "--NotebookApp.disable_check_xsrf=True",
@@ -34,7 +29,10 @@ CONTAINERCMD=[
     "--ip=0.0.0.0",
     "--no-browser",
     "--notebook-dir=./work"]
-COLABLINK='https://colab.research.google.com/github/epi2me-labs/resources/blob/master/welcome.ipynb'
+COLABLINK = 'https://colab.research.google.com/github/epi2me-labs/resources/blob/master/welcome.ipynb'
+
+
+Window.size = (400, 200)
 
 
 class BoxRows(list):
@@ -59,8 +57,6 @@ class HomeScreen(Screen):
 
         self.app = App.get_running_app()
 
-        self.bind(cstatus=self.on_status_change)
-
         rows = BoxRows()
 
         row = rows.new_row()
@@ -83,8 +79,20 @@ class HomeScreen(Screen):
         helptext.bind(on_ref_press=self.open_colab)
         row.add_widget(helptext)
 
+        def copy_button_press(button):
+            button.text = button.text.replace("Copy", "Copied")
+
+        row = rows.new_row()
+        self.copy_button = Button(text=self.app.local_address, width=50)
+        self.copy_button.bind(on_press=self.copy_local_address_to_clipboard)
+        self.copy_button.bind(on_release=copy_button_press)
+        row.add_widget(self.copy_button)
+
         self.add_widget(rows.layout)
-        self.height=100
+        self.height = 100
+
+    def copy_local_address_to_clipboard(self, *args):
+        pyperclip.copy(self.app.local_address)
 
     def open_colab(self, *args):
         webbrowser.open(COLABLINK)
@@ -93,69 +101,71 @@ class HomeScreen(Screen):
         self.manager.transition.direction = 'left'
         self.manager.current = 'start'
 
-    def on_status_change(self, *args):
+    def on_cstatus(self, *args):
         self.containerlbl.text = "Server status: {}.".format(self.cstatus)
 
         self.startbtn.text = "Start"
         if self.cstatus in "running":
             self.startbtn.disabled = True
             self.stopbtn.disabled = False
+            if self.app.local_address == "Local address unavailable":
+                self.copy_button.disabled = True
+                self.copy_button.text = self.app.local_address
+            else:
+                self.copy_button.disabled = False
+                self.copy_button.text = "Copy \"{}\" to clipboard".format(self.app.local_address)
         elif self.cstatus in ("created", "exited", "paused", "dead", "inactive"):
             self.startbtn.disabled = False
             self.stopbtn.disabled = True
+            self.copy_button.disabled = True
             if self.cstatus != "inactive":
                 self.startbtn.text = "Restart"
 
 
 class StartScreen(Screen):
     cstatus = StringProperty('unknown')
+    start_status = StringProperty('Start server')
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
         self.app = App.get_running_app()
-        self.bind(cstatus=self.on_status_change)
+        self.image = None
 
-        rows = list()
-        def new_row():
-            r = BoxLayout()
-            rows.append(r)
-            return r
+        rows = BoxRows()
 
-        row = new_row()
-        self.containerlbl = Label(text='Start server.')
+        row = rows.new_row()
+        self.containerlbl = Label(text=self.start_status)
+        self.bind(start_status=self.containerlbl.setter('text'))
         row.add_widget(self.containerlbl)
 
-        row = new_row()
+        row = rows.new_row()
         row.add_widget(Label(text='data location'))
         self.datamount_input = TextInput(text=DATAMOUNT)
         row.add_widget(self.datamount_input)
 
-        row = new_row()
+        row = rows.new_row()
         row.add_widget(Label(text='token'))
         self.token_input = TextInput(text=LABSTOKEN)
         row.add_widget(self.token_input)
 
-        row = new_row()
+        row = rows.new_row()
         row.add_widget(Label(text='port'))
         self.port_input = TextInput(text=str(PORTHOST))
         row.add_widget(self.port_input)
 
-        row = new_row()
+        row = rows.new_row()
         self.startbtn = Button(text='Start')
         self.startbtn.bind(on_release=self.start_server)
         row.add_widget(self.startbtn)
 
-        stopbtn = Button(text='Back', width=50)
-        stopbtn.bind(on_release=self.goto_home)
-        row.add_widget(stopbtn)
+        self.backbtn = Button(text='Back', width=50)
+        self.backbtn.bind(on_release=self.goto_home)
+        row.add_widget(self.backbtn)
 
-        layout = BoxLayout(orientation='vertical')
-        for r in rows:
-            layout.add_widget(r)
-        self.add_widget(layout)
+        self.add_widget(rows.layout)
 
-    def on_status_change(self, *args):
+    def on_cstatus(self, *args):
         msg = ""
         start_text = "Start"
         if self.cstatus == "inactive":
@@ -167,26 +177,68 @@ class StartScreen(Screen):
         self.startbtn.text = start_text
         self.containerlbl.text = 'Start server{}'.format(msg)
 
-
     def goto_home(self, *args):
         self.manager.transition.direction = 'right'
         self.manager.current = 'home'
 
     def start_server(self, *args):
+        # create thread external to GUI loop
+        thread = Thread(target=self._start)
+        thread.start()
+
+    def _start(self):
+        latest = "{}:latest".format(CONTAINER)
+        client = self.app.docker
+        try:
+            self.image = client.images.get(latest).short_id
+        except docker.errors.ImageNotFound as e:
+            self.startbtn.disabled = True
+            self.backbtn.disabled = True
+            self.containerlbl.text = "Start server (downloading)"
+            # Run pull in a thread to provide feedback
+            thread = Thread(target=self._pull, args=[latest])
+            thread.start()
+            # ...wait for pull to finish
+            prog = '|/-\|-/-'
+            pi = 0
+            font = self.startbtn.font_name
+            self.startbtn.font_name = "RobotoMono-Regular"
+            while self.image is None:
+                time.sleep(1)
+                symbol = prog[pi % len(prog)]
+                pi += 1
+                self.startbtn.text = "Download...{}".format(symbol)
+            # pull finished
+            self.startbtn.font_name = font
+            self.startbtn.disabled = False
+            self.backbtn.disabled = False
+
         self.app.start_container(
             self.datamount_input.text, self.token_input.text,
             int(self.port_input.text))
         if self.cstatus == "running":
             self.goto_home()
 
+    def _pull(self, image):
+        self.image = self.app.docker.images.pull(image).short_id
+
 
 class LabsLauncherApp(App):
 
     cstatus = StringProperty('unknown')
+    _local_address = "Local address unavailable"
 
     def __init__(self, *args, **kwargs):
         super().__init__(**kwargs)
         self.docker = docker.from_env()
+
+    @property
+    def local_address(self):
+        return self._local_address
+
+    def set_local_address(self, port=PORTBIND, token=LABSTOKEN):
+        local_address_format = "http://localhost:{}?token={}"
+        self._local_address = local_address_format.format(port, token)
 
     def build(self):
         self.sm = ScreenManager()
@@ -239,14 +291,16 @@ class LabsLauncherApp(App):
                 ports={int(port):int(port)},
                 environment=['JUPYTER_ENABLE_LAB=yes'],
                 volumes={
-                    mount:{
-                        'bind':DATABIND, 'mode':'rw'}},
+                    mount: {
+                        'bind': DATABIND, 'mode': 'rw'}},
                 name=SERVER_NAME)
+            self.set_local_address(port=port, token=token)
         except Exception as e:
             #TODO: better feedback on failure
             pass
 
         self.set_status()
+
 
 
 

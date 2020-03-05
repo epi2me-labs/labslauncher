@@ -14,6 +14,7 @@ ifeq ($(shell uname), Darwin)
         SEDI   = sed -i ""
 endif
 
+
 venv: venv/bin/activate
 IN_VENV=. ./venv/bin/activate
 
@@ -35,13 +36,12 @@ run: venv
 .PHONY: build
 build: dist/Epi2MeLabs-Launcher
 
+
 .PHONY: clean
 clean:
 	rm -rf Epi2MeLabs-Launcher.spec __pycache__ dist build venv
 	rm -rf tmp *.deb
 
-test:
-	    lintian *.deb
 
 deb: clean dist/Epi2MeLabs-Launcher
 	mkdir -p deb-src/usr/local/bin
