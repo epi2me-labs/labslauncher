@@ -1,48 +1,31 @@
-#!/usr/bin/env python
-import time
+"""Kivy Screens for the labslauncher application."""
+
 from threading import Thread
+import time
 import webbrowser
 
-import docker
 from kivy.app import App
-from kivy.core.window import Window
 from kivy.properties import StringProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.label import Label
-from kivy.uix.screenmanager import Screen, ScreenManager
+from kivy.uix.screenmanager import Screen
 from kivy.uix.textinput import TextInput
 import pyperclip
 
-CONTAINER = 'ontresearch/nanolabs-notebook'
-SERVER_NAME = 'Epi2Me-Labs-Server'
-DATAMOUNT = '/data/'
-DATABIND = '/home/jovyan/work'
-PORTHOST = 8888
-PORTBIND = 8888
-LABSTOKEN = 'epi2me'
-CONTAINERCMD = [
-    "start-notebook.sh",
-    "--NotebookApp.allow_origin='https://colab.research.google.com'",
-    "--NotebookApp.disable_check_xsrf=True",
-    "--NotebookApp.port_retries=0",
-    "--ip=0.0.0.0",
-    "--no-browser",
-    "--notebook-dir=./work"]
-COLABLINK = 'https://colab.research.google.com/github/epi2me-labs/resources/blob/master/welcome.ipynb'
-
-
-Window.size = (400, 200)
-
 
 class BoxRows(list):
+    """Helper to generate a boxy kivy layout."""
+
     def new_row(self):
+        """Add and return a new row."""
         r = BoxLayout()
         self.append(r)
         return r
 
     @property
     def layout(self):
+        """Generate the layout."""
         layout = BoxLayout(orientation='vertical')
         for r in self:
             layout.add_widget(r)
@@ -50,9 +33,12 @@ class BoxRows(list):
 
 
 class HomeScreen(Screen):
+    """Home screen for application."""
+
     cstatus = StringProperty('unknown')
 
     def __init__(self, **kwargs):
+        """Initialize the home screen."""
         super().__init__(**kwargs)
 
         self.app = App.get_running_app()
@@ -74,7 +60,8 @@ class HomeScreen(Screen):
 
         row = rows.new_row()
         helptext = Label(
-            text="Navigate to the [color=2a7cdf][ref=click]Welcome page[/ref][/color] to get started.",
+            text="Navigate to the [color=2a7cdf][ref=click]"
+                 "Welcome page[/ref][/color] to get started.",
             markup=True)
         helptext.bind(on_ref_press=self.open_colab)
         row.add_widget(helptext)
@@ -92,16 +79,20 @@ class HomeScreen(Screen):
         self.height = 100
 
     def copy_local_address_to_clipboard(self, *args):
+        """Copy server address to clipboard."""
         pyperclip.copy(self.app.local_address)
 
     def open_colab(self, *args):
-        webbrowser.open(COLABLINK)
+        """Open our Google Colab landing page."""
+        webbrowser.open(self.app.conf.COLABLINK)
 
     def goto_start_settings(self, *args):
+        """Move GUI to start container screen."""
         self.manager.transition.direction = 'left'
         self.manager.current = 'start'
 
     def on_cstatus(self, *args):
+        """Set state when container status changes."""
         self.containerlbl.text = "Server status: {}.".format(self.cstatus)
 
         self.startbtn.text = "Start"
@@ -113,8 +104,10 @@ class HomeScreen(Screen):
                 self.copy_button.text = self.app.local_address
             else:
                 self.copy_button.disabled = False
-                self.copy_button.text = "Copy \"{}\" to clipboard".format(self.app.local_address)
-        elif self.cstatus in ("created", "exited", "paused", "dead", "inactive"):
+                self.copy_button.text = "Copy \"{}\" to clipboard".format(
+                    self.app.local_address)
+        elif self.cstatus in (
+                "created", "exited", "paused", "dead", "inactive"):
             self.startbtn.disabled = False
             self.stopbtn.disabled = True
             self.copy_button.disabled = True
@@ -123,10 +116,13 @@ class HomeScreen(Screen):
 
 
 class StartScreen(Screen):
+    """Screen for starting and updating the server."""
+
     cstatus = StringProperty('unknown')
     start_status = StringProperty('Start server')
 
     def __init__(self, **kwargs):
+        """Initialize start screen."""
         super().__init__(**kwargs)
 
         self.app = App.get_running_app()
@@ -141,17 +137,20 @@ class StartScreen(Screen):
 
         row = rows.new_row()
         row.add_widget(Label(text='data location'))
-        self.datamount_input = TextInput(text=DATAMOUNT)
+        self.datamount_input = TextInput(
+            text=self.app.conf.DATAMOUNT)
         row.add_widget(self.datamount_input)
 
         row = rows.new_row()
         row.add_widget(Label(text='token'))
-        self.token_input = TextInput(text=LABSTOKEN)
+        self.token_input = TextInput(
+            text=self.app.conf.LABSTOKEN)
         row.add_widget(self.token_input)
 
         row = rows.new_row()
         row.add_widget(Label(text='port'))
-        self.port_input = TextInput(text=str(PORTHOST))
+        self.port_input = TextInput(
+            text=str(self.app.conf.PORTHOST))
         row.add_widget(self.port_input)
 
         row = rows.new_row()
@@ -166,6 +165,7 @@ class StartScreen(Screen):
         self.add_widget(rows.layout)
 
     def on_cstatus(self, *args):
+        """Set state when container status changes."""
         msg = ""
         start_text = "Start"
         if self.cstatus == "inactive":
@@ -178,32 +178,38 @@ class StartScreen(Screen):
         self.containerlbl.text = 'Start server{}'.format(msg)
 
     def goto_home(self, *args):
+        """Move GUI back to home screen."""
         self.manager.transition.direction = 'right'
         self.manager.current = 'home'
 
     def start_server(self, *args):
+        """Start the server container."""
         # create thread external to GUI loop
         thread = Thread(target=self._start)
+        thread.daemon = True
         thread.start()
 
     def _start(self):
-        latest = "{}:latest".format(CONTAINER)
-        client = self.app.docker
-        try:
-            self.image = client.images.get(latest).short_id
-        except docker.errors.ImageNotFound as e:
+        """Worker for starting container and providing on screen feedback.
+
+        Will trigger an image pull if the requested image tag is not
+        available.
+        """
+        if self.app.image is None:
+            # we don't have the required tag
             self.startbtn.disabled = True
             self.backbtn.disabled = True
             self.containerlbl.text = "Start server (downloading)"
             # Run pull in a thread to provide feedback
-            thread = Thread(target=self._pull, args=[latest])
+            thread = Thread(target=self.app.ensure_image)
+            thread.daemon = True
             thread.start()
             # ...wait for pull to finish
-            prog = '|/-\|-/-'
+            prog = r'|/-\|-/-'
             pi = 0
             font = self.startbtn.font_name
             self.startbtn.font_name = "RobotoMono-Regular"
-            while self.image is None:
+            while self.app.image is None:
                 time.sleep(1)
                 symbol = prog[pi % len(prog)]
                 pi += 1
@@ -215,100 +221,6 @@ class StartScreen(Screen):
 
         self.app.start_container(
             self.datamount_input.text, self.token_input.text,
-            int(self.port_input.text))
+            int(self.port_input.text), self.app.im_request)
         if self.cstatus == "running":
             self.goto_home()
-
-    def _pull(self, image):
-        self.image = self.app.docker.images.pull(image).short_id
-
-
-class LabsLauncherApp(App):
-
-    cstatus = StringProperty('unknown')
-    _local_address = "Local address unavailable"
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(**kwargs)
-        self.docker = docker.from_env()
-
-    @property
-    def local_address(self):
-        return self._local_address
-
-    def set_local_address(self, port=PORTBIND, token=LABSTOKEN):
-        local_address_format = "http://localhost:{}?token={}"
-        self._local_address = local_address_format.format(port, token)
-
-    def build(self):
-        self.sm = ScreenManager()
-        self.sm.add_widget(HomeScreen(name='home'))
-        self.sm.add_widget(StartScreen(name='start'))
-
-        for screen in ('home', 'start'):
-            self.bind(cstatus=self.sm.get_screen(screen).setter('cstatus'))
-        self.set_status()
-
-        return self.sm
-
-    @property
-    def container(self):
-        for cont in self.docker.containers.list(True):
-            if cont.name == SERVER_NAME:
-                return cont
-        return None
-
-    def set_status(self):
-        c = self.container
-        new_status = 'inactive'
-        if c is not None:
-            new_status = c.status
-        if new_status != self.cstatus:
-            self.cstatus = new_status
-
-    def clear_container(self, *args):
-        cont = self.container
-        if cont is not None:
-            cont.remove(force=True)
-            try:
-                cont.wait(condition='removed')
-            except docker.errors.NotFound:
-                # we were already successful
-                pass
-        self.docker.containers.prune()
-        self.docker.images.prune()
-        self.set_status()
-
-    def start_container(self, mount, token, port):
-        self.clear_container()
-
-        # colab required the port in the container to be equal
-        CMD = CONTAINERCMD + [
-            "--NotebookApp.token={}".format(token),
-            "--port={}".format(port),
-            ]
-
-        try:
-            self.docker.containers.run(
-                CONTAINER,
-                CMD,
-                auto_remove=True,
-                detach=True,
-                ports={int(port):int(port)},
-                environment=['JUPYTER_ENABLE_LAB=yes'],
-                volumes={
-                    mount: {
-                        'bind': DATABIND, 'mode': 'rw'}},
-                name=SERVER_NAME)
-            self.set_local_address(port=port, token=token)
-        except Exception as e:
-            #TODO: better feedback on failure
-            pass
-
-        self.set_status()
-
-
-
-
-if __name__ == '__main__':
-    LabsLauncherApp().run()

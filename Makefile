@@ -14,23 +14,28 @@ ifeq ($(shell uname), Darwin)
         SEDI   = sed -i ""
 endif
 
+PYTHON ?= python
 
-venv: venv/bin/activate
 IN_VENV=. ./venv/bin/activate
 
 venv/bin/activate:
-	test -d venv || virtualenv venv --python=python3 --prompt "(build) "
+	test -d venv || virtualenv venv --python=$(PYTHON) --prompt "(build) "
 	${IN_VENV} && pip install pip --upgrade
 	${IN_VENV} && pip install -r requirements.txt
 
+testenv: venv/bin/activate
 
-dist/Epi2MeLabs-Launcher: venv
-	${IN_VENV} && xvfb-run pyinstaller labslauncher.py --onefile -n Epi2MeLabs-Launcher --hidden-import cython
+test: venv/bin/activate
+	${IN_VENV} && pip install flake8 flake8-rst-docstrings flake8-docstrings flake8-import-order
+	${IN_VENV} && flake8 labslauncher --import-order-style google --application-import-names labslauncher --statistics
+
+dist/Epi2MeLabs-Launcher: venv/bin/activate
+	${IN_VENV} && xvfb-run pyinstaller labslauncher --onefile -n Epi2MeLabs-Launcher --hidden-import cython
 
 
 .PHONY: run
-run: venv
-	${IN_VENV} && python labslauncher.py
+run: venv/bin/activate
+	${IN_VENV} && labslauncher
 
 
 .PHONY: build
