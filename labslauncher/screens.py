@@ -119,7 +119,6 @@ class StartScreen(Screen):
     """Screen for starting and updating the server."""
 
     cstatus = StringProperty('unknown')
-    start_status = StringProperty('Start server')
 
     def __init__(self, **kwargs):
         """Initialize start screen."""
@@ -131,8 +130,7 @@ class StartScreen(Screen):
         rows = BoxRows()
 
         row = rows.new_row()
-        self.containerlbl = Label(text=self.start_status)
-        self.bind(start_status=self.containerlbl.setter('text'))
+        self.containerlbl = Label(text='Start server')
         row.add_widget(self.containerlbl)
 
         row = rows.new_row()
@@ -157,6 +155,11 @@ class StartScreen(Screen):
         self.startbtn = Button(text='Start')
         self.startbtn.bind(on_release=self.start_server)
         row.add_widget(self.startbtn)
+
+        self.updatebtn = Button(text='Update')
+        self.updatebtn.bind(on_release=self.update_server)
+        self.updatebtn.disabled = not self.app.can_update
+        row.add_widget(self.updatebtn)
 
         self.backbtn = Button(text='Back', width=50)
         self.backbtn.bind(on_release=self.goto_home)
@@ -184,8 +187,13 @@ class StartScreen(Screen):
 
     def start_server(self, *args):
         """Start the server container."""
-        # create thread external to GUI loop
         thread = Thread(target=self._start)
+        thread.daemon = True
+        thread.start()
+
+    def update_server(self, *args):
+        """Update the server container."""
+        thread = Thread(target=self._pull_image, kwargs={'update': True})
         thread.daemon = True
         thread.start()
 
@@ -196,31 +204,43 @@ class StartScreen(Screen):
         available.
         """
         if self.app.image is None:
-            # we don't have the required tag
-            self.startbtn.disabled = True
-            self.backbtn.disabled = True
-            self.containerlbl.text = "Start server (downloading)"
-            # Run pull in a thread to provide feedback
-            thread = Thread(target=self.app.ensure_image)
-            thread.daemon = True
-            thread.start()
-            # ...wait for pull to finish
-            prog = r'|/-\|-/-'
-            pi = 0
-            font = self.startbtn.font_name
-            self.startbtn.font_name = "RobotoMono-Regular"
-            while self.app.image is None:
-                time.sleep(1)
-                symbol = prog[pi % len(prog)]
-                pi += 1
-                self.startbtn.text = "Download...{}".format(symbol)
-            # pull finished
-            self.startbtn.font_name = font
-            self.startbtn.disabled = False
-            self.backbtn.disabled = False
+            # we don't have an image to run
+            self._pull_image()
 
         self.app.start_container(
             self.datamount_input.text, self.token_input.text,
-            int(self.port_input.text), self.app.im_request)
+            int(self.port_input.text))
         if self.cstatus == "running":
             self.goto_home()
+
+    def _pull_image(self, update=False):
+        # TODO: could use a kivy property and use callback to manage state
+        self.startbtn.disabled = True
+        self.updatebtn.disabled = True
+        self.backbtn.disabled = True
+        self.containerlbl.text = "Start server (downloading)"
+        # Run pull in a thread to provide feedback
+        func = self.app.ensure_image
+        if update:
+            self.app.image = None  # bit of a hack
+            func = self.app.update_image
+        thread = Thread(target=func)
+        thread.daemon = True
+        thread.start()
+        # ...wait for pull to finish
+        prog = r'|/-\|-/-'
+        pi = 0
+        font = self.startbtn.font_name
+        self.startbtn.font_name = "RobotoMono-Regular"
+        while self.app.image is None:
+            time.sleep(1)
+            symbol = prog[pi % len(prog)]
+            pi += 1
+            self.startbtn.text = "Download...{}".format(symbol)
+        # pull finished
+        self.containerlbl.text = "Start server"
+        self.startbtn.text = "Start"
+        self.startbtn.font_name = font
+        self.startbtn.disabled = False
+        self.updatebtn.disabled = not self.app.can_update
+        self.backbtn.disabled = False
