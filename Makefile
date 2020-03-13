@@ -35,7 +35,7 @@ dist/Epi2MeLabs-Launcher: venv/bin/activate
 
 .PHONY: run
 run: venv/bin/activate
-	${IN_VENV} && labslauncher
+	${IN_VENV} && python setup.py develop && labslauncher
 
 
 .PHONY: build
@@ -67,6 +67,4 @@ deb: clean dist/Epi2MeLabs-Launcher
 	(cd tmp; fakeroot dpkg -b . ../$(DEB))
 	dpkg -I $(DEB)
 	dpkg -c $(DEB)
-
-
 

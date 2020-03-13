@@ -35,8 +35,13 @@ class LabsLauncherApp(App):
         self.conf = LauncherConfig()
         self._local_address = "Local address unavailable"
 
+        # a list of all tags on dockerhub
         self.im_tags = util.get_image_tags(self.conf.CONTAINER)
-        self.im_request = 'v0.0.1-alpha.1'
+        # the newest tag available locally
+        self.im_request = util.newest_tag(
+            self.conf.CONTAINER, tags=self.im_tags, client=self.docker)
+        # set self.image to the newest local image, or None
+        # if nothing available
         self.set_image()
 
     def build(self):
@@ -53,11 +58,16 @@ class LabsLauncherApp(App):
     @property
     def image_name(self):
         """Return the image name for the requested tag."""
+        if self.im_request is None:
+            raise ValueError("No local tag available.")
         return "{}:{}".format(self.conf.CONTAINER, self.im_request)
 
     def get_image(self):
         """Get the docker image."""
-        return self.docker.images.get(self.image_name)
+        try:
+            return self.docker.images.get(self.image_name)
+        except Exception:
+            raise docker.errors.ImageNotFound("No local image available.")
 
     def set_image(self):
         """Set image attribute of this class.
@@ -74,10 +84,22 @@ class LabsLauncherApp(App):
 
         If the image is not found locally the image is pulled.
         """
+        self.image = None
         try:
             self.image = self.get_image()
         except docker.errors.ImageNotFound:
             self.image = self.pull_tag(self.im_request)
+
+    @property
+    def can_update(self):
+        """Determine if an updated image is available."""
+        return self.im_tags[0] != self.im_request
+
+    def update_image(self):
+        """Update the image to the newest tag."""
+        self.image = None
+        self.im_request = self.im_tags[0]
+        self.ensure_image()
 
     @property
     def local_address(self):
@@ -115,11 +137,14 @@ class LabsLauncherApp(App):
             cont.remove()
         self.set_status()
 
-    def start_container(self, mount, token, port, tag=None):
-        """Start the server container, removing a previous one if necessary."""
+    def start_container(self, mount, token, port):
+        """Start the server container, removing a previous one if necessary.
+
+        .. note:: The behaviour of docker.run is that a pull will be invoked if
+            the image is not available locally. To ensure more controlled
+            behaviour check .get_image() first.
+        """
         self.clear_container()
-        if tag is None:
-            raise NotImplementedError("Calling without tag not supported")
 
         # colab requires the port in the container to be equal
         CMD = self.conf.CONTAINERCMD + [
@@ -129,7 +154,7 @@ class LabsLauncherApp(App):
 
         try:
             self.docker.containers.run(
-                "{}:{}".format(self.conf.CONTAINER, tag),
+                self.image_name,
                 CMD,
                 detach=True,
                 ports={int(port): int(port)},
