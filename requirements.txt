@@ -1,18 +1,9 @@
-altgraph==0.17
-certifi==2019.11.28
-chardet==3.0.4
+Cython==0.29.15
 docker==4.2.0
-docutils==0.16
-idna==2.9
 Kivy==1.11.1
 Kivy-Garden==0.1.4
-#pkg-resources
-pyenchant==2.0.0
-Pygments==2.5.2
 PyInstaller==3.6
 pyperclip==1.7.0
-requests==2.23.0
+requests==2.18.4
 semver==2.9.1
-six==1.14.0
-urllib3==1.25.8
-websocket-client==0.57.0
+setuptools < 45

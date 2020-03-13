@@ -1,7 +1,8 @@
+# CI sets MAJOR.MINOR.PATCH for git tags
 PROJECT  ?= ont-epi2melabs-launcher
 MAJOR    ?= 0
-MINOR    ?= 1
-SUB      ?= 1
+MINOR    ?= 0
+SUB      ?= 0
 PATCH    ?= 0
 VERSION   ="$(MAJOR).$(MINOR).$(SUB)"
 CODENAME ?= $(shell awk -F= '/CODENAME/{print $$2}' /etc/lsb-release)
@@ -15,6 +16,7 @@ ifeq ($(shell uname), Darwin)
 endif
 
 PYTHON ?= python
+XVFBRUN ?=
 
 IN_VENV=. ./venv/bin/activate
 
@@ -30,7 +32,8 @@ test: venv/bin/activate
 	${IN_VENV} && flake8 labslauncher --import-order-style google --application-import-names labslauncher --statistics
 
 dist/Epi2MeLabs-Launcher: venv/bin/activate
-	${IN_VENV} && xvfb-run pyinstaller labslauncher --onefile -n Epi2MeLabs-Launcher --hidden-import cython
+	${IN_VENV} && python setup.py develop
+	${IN_VENV} && $(XVFBRUN) pyinstaller Epi2MeLabs-Launcher.spec
 
 
 .PHONY: run
@@ -44,7 +47,7 @@ build: dist/Epi2MeLabs-Launcher
 
 .PHONY: clean
 clean:
-	rm -rf Epi2MeLabs-Launcher.spec __pycache__ dist build venv
+	rm -rf __pycache__ dist build venv
 	rm -rf tmp *.deb
 
 
