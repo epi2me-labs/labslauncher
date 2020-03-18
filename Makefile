@@ -47,8 +47,7 @@ build: dist/Epi2MeLabs-Launcher
 
 .PHONY: clean
 clean:
-	rm -rf __pycache__ dist build venv
-	rm -rf tmp *.deb
+	rm -rf __pycache__ dist build venv labslauncher.egg-info tmp *.deb
 
 
 deb: clean dist/Epi2MeLabs-Launcher

@@ -1,0 +1,90 @@
+#:import Factory kivy.factory.Factory
+
+<Copypopup@Popup>:
+    auto_dismiss: True
+    title: "Copied to clipboard"
+    size_hint: 0.5, 0.5
+
+<HomeScreen>:
+    id: home_screen
+    containerlbl: containerlbl
+    startbtn: startbtn
+    stopbtn: stopbtn
+    addrbtn: addrbtn
+    BoxLayout:
+        orientation: "vertical"
+        BoxLayout:
+            Label:
+                id: containerlbl
+                text: "Server status:"
+        BoxLayout:
+            Label:
+                id: addrbtn
+                text: root.address_fmt
+                markup: True
+                on_ref_press: root.copy_address_to_clip(), Factory.Copypopup().open()
+        BoxLayout:
+            Button:
+                id: startbtn
+                text: "Start"
+                on_press: root.goto_start_settings()
+            Button:
+                id: stopbtn
+                text: "Stop"
+                on_release: app.clear_container()
+        BoxLayout:
+            Label:
+                text: "Navigate to the [color=2a7cdf][ref=click]Welcome page[/ref][/color] to get started."
+                markup: True
+                on_ref_press: root.open_colab()
+
+<StartScreen>:
+    id: start_screen
+    containerlbl: containerlbl
+    datamount_input: datamount_input
+    token_input: token_input
+    port_input: port_input
+    startbtn: startbtn
+    updatebtn: updatebtn
+    backbtn: backbtn
+    BoxLayout:
+        orientation: "vertical"
+        BoxLayout:
+            Label:
+                id: containerlbl
+                text: "Start server"
+        BoxLayout:
+            Label:
+                text: "data location"
+            TextInput:
+                id: datamount_input
+                text: app.conf.DATAMOUNT
+        BoxLayout:
+            Label:
+                text: "token"
+            TextInput:
+                id: token_input
+                text: app.conf.LABSTOKEN
+        BoxLayout:
+            Label:
+                text: "port"
+            TextInput:
+                id: port_input
+                text: str(app.conf.PORTHOST)
+        BoxLayout:
+            Button:
+                id: startbtn
+                text: "Start"
+                on_release: root.start_server()
+            Button:
+                id: updatebtn
+                text: "Update"
+                on_release: root.update_server
+                # TODO: can_update could be a property to bind
+                disabled: not app.can_update
+            Button:
+                id: backbtn
+                text: "Back"
+                on_release: root.goto_home()
+
+

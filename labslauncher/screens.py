@@ -4,92 +4,26 @@ from threading import Thread
 import time
 import webbrowser
 
+import kivy
 from kivy.app import App
 from kivy.properties import StringProperty
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
-from kivy.uix.label import Label
 from kivy.uix.screenmanager import Screen
-from kivy.uix.textinput import TextInput
 import pyperclip
 
-
-class BoxRows(list):
-    """Helper to generate a boxy kivy layout."""
-
-    def new_row(self):
-        """Add and return a new row."""
-        r = BoxLayout()
-        self.append(r)
-        return r
-
-    @property
-    def layout(self):
-        """Generate the layout."""
-        layout = BoxLayout(orientation='vertical')
-        for r in self:
-            layout.add_widget(r)
-        return layout
+kivy.require('1.0.5')
 
 
 class HomeScreen(Screen):
     """Home screen for application."""
 
     cstatus = StringProperty('unknown')
+    address = StringProperty('')
+    address_fmt = StringProperty('')
 
     def __init__(self, **kwargs):
         """Initialize the home screen."""
         super().__init__(**kwargs)
-
         self.app = App.get_running_app()
-
-        rows = BoxRows()
-
-        row = rows.new_row()
-        self.containerlbl = Label()
-        row.add_widget(self.containerlbl)
-
-        row = rows.new_row()
-        self.startbtn = Button(text='Start', width=50)
-        self.startbtn.bind(on_press=self.goto_start_settings)
-        row.add_widget(self.startbtn)
-
-        self.stopbtn = Button(text='Stop', width=50)
-        self.stopbtn.bind(on_release=self.app.clear_container)
-        row.add_widget(self.stopbtn)
-
-        row = rows.new_row()
-        helptext = Label(
-            text="Navigate to the [color=2a7cdf][ref=click]"
-                 "Welcome page[/ref][/color] to get started.",
-            markup=True)
-        helptext.bind(on_ref_press=self.open_colab)
-        row.add_widget(helptext)
-
-        def copy_button_press(button):
-            button.text = button.text.replace("Copy", "Copied")
-
-        row = rows.new_row()
-        self.copy_button = Button(text=self.app.local_address, width=50)
-        self.copy_button.bind(on_press=self.copy_local_address_to_clipboard)
-        self.copy_button.bind(on_release=copy_button_press)
-        row.add_widget(self.copy_button)
-
-        self.add_widget(rows.layout)
-        self.height = 100
-
-    def copy_local_address_to_clipboard(self, *args):
-        """Copy server address to clipboard."""
-        pyperclip.copy(self.app.local_address)
-
-    def open_colab(self, *args):
-        """Open our Google Colab landing page."""
-        webbrowser.open(self.app.conf.COLABLINK)
-
-    def goto_start_settings(self, *args):
-        """Move GUI to start container screen."""
-        self.manager.transition.direction = 'left'
-        self.manager.current = 'start'
 
     def on_cstatus(self, *args):
         """Set state when container status changes."""
@@ -99,20 +33,34 @@ class HomeScreen(Screen):
         if self.cstatus in "running":
             self.startbtn.disabled = True
             self.stopbtn.disabled = False
-            if self.app.local_address == "Local address unavailable":
-                self.copy_button.disabled = True
-                self.copy_button.text = self.app.local_address
-            else:
-                self.copy_button.disabled = False
-                self.copy_button.text = "Copy \"{}\" to clipboard".format(
-                    self.app.local_address)
         elif self.cstatus in (
                 "created", "exited", "paused", "dead", "inactive"):
             self.startbtn.disabled = False
             self.stopbtn.disabled = True
-            self.copy_button.disabled = True
             if self.cstatus != "inactive":
                 self.startbtn.text = "Restart"
+
+    def on_address(self, *args):
+        """Set state when address changes."""
+        if "unavailable" in self.address:
+            self.address_fmt = self.address
+        else:
+            self.address_fmt = \
+                "[color=2a7cdf][ref=click]{}[/ref][/color]".format(
+                    self.address)
+
+    def copy_address_to_clip(self, *args):
+        """Copy server address to clipboard."""
+        pyperclip.copy(self.address)
+
+    def open_colab(self, *args):
+        """Open our Google Colab landing page."""
+        webbrowser.open(self.app.conf.COLABLINK)
+
+    def goto_start_settings(self, *args):
+        """Move GUI to start container screen."""
+        self.manager.transition.direction = 'left'
+        self.manager.current = 'start'
 
 
 class StartScreen(Screen):
@@ -126,46 +74,6 @@ class StartScreen(Screen):
 
         self.app = App.get_running_app()
         self.image = None
-
-        rows = BoxRows()
-
-        row = rows.new_row()
-        self.containerlbl = Label(text='Start server')
-        row.add_widget(self.containerlbl)
-
-        row = rows.new_row()
-        row.add_widget(Label(text='data location'))
-        self.datamount_input = TextInput(
-            text=self.app.conf.DATAMOUNT)
-        row.add_widget(self.datamount_input)
-
-        row = rows.new_row()
-        row.add_widget(Label(text='token'))
-        self.token_input = TextInput(
-            text=self.app.conf.LABSTOKEN)
-        row.add_widget(self.token_input)
-
-        row = rows.new_row()
-        row.add_widget(Label(text='port'))
-        self.port_input = TextInput(
-            text=str(self.app.conf.PORTHOST))
-        row.add_widget(self.port_input)
-
-        row = rows.new_row()
-        self.startbtn = Button(text='Start')
-        self.startbtn.bind(on_release=self.start_server)
-        row.add_widget(self.startbtn)
-
-        self.updatebtn = Button(text='Update')
-        self.updatebtn.bind(on_release=self.update_server)
-        self.updatebtn.disabled = not self.app.can_update
-        row.add_widget(self.updatebtn)
-
-        self.backbtn = Button(text='Back', width=50)
-        self.backbtn.bind(on_release=self.goto_home)
-        row.add_widget(self.backbtn)
-
-        self.add_widget(rows.layout)
 
     def on_cstatus(self, *args):
         """Set state when container status changes."""
