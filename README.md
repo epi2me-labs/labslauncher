@@ -1,20 +1,40 @@
 # ont-labslauncher
 
-Epi2Me Labs Server Control
-created by cwright
+Epi2Me Labs Server Control created by *cwright*
 
 Requirements:
 * python3
-* make
 * docker
+* virtualenv
+* make
+
+The last two are not strictly required to simply build and run the application
+but are helpful for development
 
 ## Quick-start
+
 ```bash
 git clone git@git.oxfordnanolabs.local:custflow/labslauncher.git
 cd labslauncher
 make run
 ```
-This will open a dialogue box requesting:
-* **data location**: A directory that you wish to be mounted containing your datasets (default: /data)
-* **token**: A secret token to add to the URL in order to access the notebook (default: epi2me)
-* **port**: Port that the notebook will be found on (default: 8888)
+
+This will:
+* create a python virtual environment
+* install python requirements
+* install the application with inplace (develop) installation
+* run the application
+
+After running the above once, the entrypoint `labslauncher` can be used to run
+the application.
+
+The applicaiton provides basic control over starting and stopping a docker
+container and updating the image used. Images are pulled from dockerhub, with
+the application detecting the newest version available. Updates to the newest
+image are not forced, the newest image locally available will be used.
+
+A hidden feature is the ability to use the `latest` image tag for development
+purposes, to do this run:
+
+    labslauncher -- --latest
+
