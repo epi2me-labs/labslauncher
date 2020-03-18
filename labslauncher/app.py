@@ -10,7 +10,7 @@ from kivy.uix.screenmanager import ScreenManager
 
 from labslauncher import LauncherConfig, screens, util
 
-Window.size = (400, 200)
+Window.size = (400, 150)
 
 
 def main():
@@ -27,13 +27,13 @@ class LabsLauncherApp(App):
     """LabsLauncher application class."""
 
     cstatus = StringProperty('unknown')
+    address = StringProperty('unavailable')
 
     def __init__(self, *args, **kwargs):
         """Initialize the application."""
         super().__init__(**kwargs)
         self.docker = docker.from_env()
         self.conf = LauncherConfig()
-        self._local_address = "Local address unavailable"
 
         # a list of all tags on dockerhub
         self.im_tags = util.get_image_tags(self.conf.CONTAINER)
@@ -52,6 +52,7 @@ class LabsLauncherApp(App):
 
         for screen in ('home', 'start'):
             self.bind(cstatus=self.sm.get_screen(screen).setter('cstatus'))
+        self.bind(address=self.sm.get_screen('home').setter('address'))
         self.set_status()
         return self.sm
 
@@ -102,16 +103,6 @@ class LabsLauncherApp(App):
         self.ensure_image()
 
     @property
-    def local_address(self):
-        """Return server address including port and token parameter."""
-        return self._local_address
-
-    def set_local_address(self, port, token):
-        """Set the local address attribute of this class."""
-        local_address_format = "http://localhost:{}?token={}"
-        self._local_address = local_address_format.format(port, token)
-
-    @property
     def container(self):
         """Return the server container if one is present, else None."""
         for cont in self.docker.containers.list(True):
@@ -120,13 +111,28 @@ class LabsLauncherApp(App):
         return None
 
     def set_status(self):
-        """Set the kivy container status property."""
+        """Set the container status property."""
         c = self.container
         new_status = 'inactive'
         if c is not None:
             new_status = c.status
         if new_status != self.cstatus:
             self.cstatus = new_status
+
+    def on_cstatus(self, *args):
+        """Update state on container status change."""
+        # find port and token
+        new_address = 'Server address unavailable'
+        if self.container is not None and self.cstatus == 'running':
+            cargs = self.container.__dict__['attrs']['Args']
+            for c in cargs:
+                if c.startswith('--port='):
+                    port = int(c.split('=')[1])
+                elif c.startswith('--NotebookApp.token='):
+                    token = c.split('=')[1]
+            new_address = "http://localhost:{}?token={}".format(
+                port, token)
+        self.address = new_address
 
     def clear_container(self, *args):
         """Kill and remove the server container."""
@@ -163,7 +169,6 @@ class LabsLauncherApp(App):
                     mount: {
                         'bind': self.conf.DATABIND, 'mode': 'rw'}},
                 name=self.conf.SERVER_NAME)
-            self.set_local_address(port, token)
         except Exception as e:
             # TODO: better feedback on failure
             print(e)
