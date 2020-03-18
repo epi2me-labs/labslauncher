@@ -6,7 +6,9 @@ import webbrowser
 
 import kivy
 from kivy.app import App
-from kivy.properties import StringProperty
+from kivy.properties import ObjectProperty, StringProperty
+from kivy.uix.floatlayout import FloatLayout
+from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import Screen
 import pyperclip
 
@@ -63,16 +65,25 @@ class HomeScreen(Screen):
         self.manager.current = 'start'
 
 
+class LoadDialog(FloatLayout):
+    """Layout to contain a filebrowser."""
+
+    load = ObjectProperty()
+    cancel = ObjectProperty()
+
+
 class StartScreen(Screen):
     """Screen for starting and updating the server."""
 
     cstatus = StringProperty('unknown')
+    chosen_path = StringProperty('')
 
     def __init__(self, **kwargs):
         """Initialize start screen."""
         super().__init__(**kwargs)
 
         self.app = App.get_running_app()
+        self.chosen_path = self.app.conf.DATAMOUNT
         self.image = None
 
     def on_cstatus(self, *args):
@@ -87,6 +98,20 @@ class StartScreen(Screen):
 
         self.startbtn.text = start_text
         self.containerlbl.text = 'Start server{}'.format(msg)
+
+    def show_load(self):
+        """Show the directory browser."""
+        content = LoadDialog(load=self.load)
+        self._popup = Popup(
+            title="Select a data folder for server.",
+            content=content, size_hint=(0.9, 0.9))
+        content.cancel = self._popup.dismiss
+        self._popup.open()
+
+    def load(self, path, filename):
+        """Set the data path."""
+        self.chosen_path = path
+        self._popup.dismiss()
 
     def goto_home(self, *args):
         """Move GUI back to home screen."""

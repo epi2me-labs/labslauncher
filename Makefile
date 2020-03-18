@@ -29,7 +29,9 @@ testenv: venv/bin/activate
 
 test: venv/bin/activate
 	${IN_VENV} && pip install flake8 flake8-rst-docstrings flake8-docstrings flake8-import-order
-	${IN_VENV} && flake8 labslauncher --import-order-style google --application-import-names labslauncher --statistics
+	${IN_VENV} && flake8 labslauncher \
+		--import-order-style google --application-import-names labslauncher \
+		--statistics --per-file-ignores='labslauncher/app.py:E402'
 
 dist/Epi2MeLabs-Launcher: venv/bin/activate
 	${IN_VENV} && python setup.py develop
