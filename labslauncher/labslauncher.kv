@@ -1,9 +1,21 @@
 #:import Factory kivy.factory.Factory
+#: import join os.path.join
+#: import isdir os.path.isdir
 
 <Copypopup@Popup>:
     auto_dismiss: True
     title: "Copied to clipboard"
     size_hint: 0.5, 0.5
+
+<OurButton@Button>:
+    size: 100, 40
+    size_hint: None, None
+<OurLabel@Label>:
+    size: root.width, 30
+    #size_hint: None, None
+<ButtonRow@BoxLayout>
+    size: root.width, 40
+    size_hint_y: None
 
 <HomeScreen>:
     id: home_screen
@@ -15,25 +27,38 @@
         orientation: "vertical"
         BoxLayout:
             Label:
+                text: "placeholder"
+        ButtonRow:
+            Label:
+                # just to pad
+            OurButton:
+                id: startbtn
+                text: "Start"
+                on_press: root.goto_start_settings()
+            OurButton:
+                id: stopbtn
+                text: "Stop"
+                on_release: app.clear_container()
+            Label:
+                # just to pad
+        BoxLayout:
+            size: root.width, 30
+            size_hint: None, None
+            OurLabel:
                 id: containerlbl
                 text: "Server status:"
         BoxLayout:
-            Label:
+            size: root.width, 30
+            size_hint: None, None
+            OurLabel:
                 id: addrbtn
                 text: root.address_fmt
                 markup: True
                 on_ref_press: root.copy_address_to_clip(), Factory.Copypopup().open()
         BoxLayout:
-            Button:
-                id: startbtn
-                text: "Start"
-                on_press: root.goto_start_settings()
-            Button:
-                id: stopbtn
-                text: "Stop"
-                on_release: app.clear_container()
-        BoxLayout:
-            Label:
+            size: root.width, 30
+            size_hint: None, None
+            OurLabel:
                 text: "Navigate to the [color=2a7cdf][ref=click]Welcome page[/ref][/color] to get started."
                 markup: True
                 on_ref_press: root.open_colab()
@@ -49,42 +74,66 @@
     backbtn: backbtn
     BoxLayout:
         orientation: "vertical"
-        BoxLayout:
-            Label:
+        ButtonRow:
+            OurLabel:
                 id: containerlbl
                 text: "Start server"
-        BoxLayout:
-            Label:
-                text: "data location"
+        ButtonRow:
+            Button:
+                id: datamount_input
+                text: 'Select path'
+                on_release: root.show_load()
             TextInput:
                 id: datamount_input
-                text: app.conf.DATAMOUNT
-        BoxLayout:
+                text: root.chosen_path
+                disabled: True
+        ButtonRow:
             Label:
                 text: "token"
             TextInput:
                 id: token_input
                 text: app.conf.LABSTOKEN
-        BoxLayout:
+        ButtonRow:
             Label:
                 text: "port"
             TextInput:
                 id: port_input
                 text: str(app.conf.PORTHOST)
-        BoxLayout:
-            Button:
+        Label:
+        ButtonRow:
+            Label:
+            OurButton:
                 id: startbtn
                 text: "Start"
                 on_release: root.start_server()
-            Button:
+            OurButton:
                 id: updatebtn
                 text: "Update"
                 on_release: root.update_server
                 # TODO: can_update could be a property to bind
                 disabled: not app.can_update
-            Button:
+            OurButton:
                 id: backbtn
                 text: "Back"
                 on_release: root.goto_home()
+            Label:
 
 
+<LoadDialog>:
+    BoxLayout:
+        size: root.size
+        pos: root.pos
+        orientation: "vertical"
+        FileChooserListView:
+            id: filechooser
+            dirselect: True
+            filters: [lambda x,y: isdir(join(x,y))]
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            Button:
+                text: "Load"
+                on_release: root.load(filechooser.path, filechooser.selection)
+            Button:
+                text: "Cancel"
+                on_release: root.cancel()

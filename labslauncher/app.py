@@ -3,14 +3,16 @@
 import sys
 
 import docker
-from kivy.app import App
-from kivy.core.window import Window
+from kivy.config import Config
+Config.set('graphics', 'resizable', False)
+Config.set('graphics', 'width', 400)
+Config.set('graphics', 'height', 400)
+from kivy.app import App  # noqa: I100  kivy requires Config needs to be first
+from kivy.config import Config
 from kivy.properties import StringProperty
 from kivy.uix.screenmanager import ScreenManager
 
 from labslauncher import LauncherConfig, screens, util
-
-Window.size = (400, 150)
 
 
 def main():
