@@ -4,15 +4,12 @@ from threading import Thread
 import time
 import webbrowser
 
-import kivy
 from kivy.app import App
 from kivy.properties import ObjectProperty, StringProperty
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import Screen
 import pyperclip
-
-kivy.require('1.0.5')
 
 
 class HomeScreen(Screen):
