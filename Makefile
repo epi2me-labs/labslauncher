@@ -16,7 +16,6 @@ ifeq ($(shell uname), Darwin)
 endif
 
 PYTHON ?= python
-XVFBRUN ?=
 
 IN_VENV=. ./venv/bin/activate
 
@@ -35,7 +34,7 @@ test: venv/bin/activate
 
 dist/Epi2MeLabs-Launcher: venv/bin/activate
 	${IN_VENV} && python setup.py develop
-	${IN_VENV} && $(XVFBRUN) pyinstaller Epi2MeLabs-Launcher.spec
+	${IN_VENV} && pyinstaller Epi2MeLabs-Launcher.spec
 
 
 .PHONY: run
