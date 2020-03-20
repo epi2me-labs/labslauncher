@@ -7,12 +7,15 @@ from kivy.config import Config
 Config.set('graphics', 'resizable', False)
 Config.set('graphics', 'width', 400)
 Config.set('graphics', 'height', 400)
-from kivy.app import App  # noqa: I100  kivy requires Config needs to be first
+import kivy  # noqa: I100  kivy requires Config needs to be first
+from kivy.app import App
 from kivy.config import Config
 from kivy.properties import StringProperty
 from kivy.uix.screenmanager import ScreenManager
 
 from labslauncher import LauncherConfig, screens, util
+
+kivy.require('1.11.1')
 
 
 def main():
@@ -42,6 +45,9 @@ class LabsLauncherApp(App):
         # the newest tag available locally
         self.im_request = util.newest_tag(
             self.conf.CONTAINER, tags=self.im_tags, client=self.docker)
+        if self.im_request is None:
+            # nothing available, request newest
+            self.im_request = self.im_tags[0]
         # set self.image to the newest local image, or None
         # if nothing available
         self.set_image()
