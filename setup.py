@@ -57,7 +57,9 @@ setup(
     extras_require=extra_requires,
     python_requires='>=3.5.2, <3.7',
     packages=find_packages(exclude=['*.test', '*.test.*', 'test.*', 'test']),
-    package_data={'labslauncher':['labslauncher.kv']},
+    # NOTE: these need to be added to the pyinstaller spec file also
+    package_data={'labslauncher':[
+        'labslauncher.kv', 'epi2me.ico']},
     zip_safe=False,
     test_suite=None,
     data_files=data_files,

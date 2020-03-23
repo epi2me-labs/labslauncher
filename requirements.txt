@@ -2,6 +2,7 @@ Cython==0.29.15
 docker==4.2.0
 Kivy==1.11.1
 Kivy-Garden==0.1.4
+Pillow==7.0.0
 PyInstaller==3.6
 pyperclip==1.7.0
 requests==2.20.0

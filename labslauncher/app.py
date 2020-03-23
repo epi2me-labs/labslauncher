@@ -12,6 +12,7 @@ from kivy.app import App
 from kivy.config import Config
 from kivy.properties import StringProperty
 from kivy.uix.screenmanager import ScreenManager
+from pkg_resources import resource_filename
 
 from labslauncher import LauncherConfig, screens, util
 
@@ -54,6 +55,8 @@ class LabsLauncherApp(App):
 
     def build(self):
         """Build the application."""
+        self.icon = resource_filename('labslauncher', 'epi2me.ico')
+        self.title = "Epi2MeLabs Launcher"
         self.sm = ScreenManager()
         self.sm.add_widget(screens.HomeScreen(name='home'))
         self.sm.add_widget(screens.StartScreen(name='start'))

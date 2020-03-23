@@ -1,6 +1,7 @@
 #:import Factory kivy.factory.Factory
 #: import join os.path.join
 #: import isdir os.path.isdir
+#: import filename pkg_resources.resource_filename
 
 <Copypopup@Popup>:
     auto_dismiss: True
@@ -26,8 +27,8 @@
     BoxLayout:
         orientation: "vertical"
         BoxLayout:
-            Label:
-                text: "placeholder"
+            Image:
+                source: filename("labslauncher", "epi2me.ico")
         ButtonRow:
             Label:
                 # just to pad
