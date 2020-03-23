@@ -1,0 +1,80 @@
+stages:
+    - test
+    - build
+    - push
+
+test:
+    image: ${IMAGE}:16.04
+    stage: test
+    before_script:
+        - export DEBIAN_FRONTEND=noninteractive
+        - apt-get update -qq && apt-get install -y -qq
+          python-virtualenv python3-dev enchant
+    script:
+        - PYTHON=python3 make test
+
+.build: &build
+    image: ${IMAGEUSED}
+    stage: build
+    script:
+        - export DEBIAN_FRONTEND=noninteractive
+        - apt-get update -qq && apt-get install -y -qq
+          build-essential wget fakeroot rsync ssh python-virtualenv python3-dev enchant xorg xvfb
+        - export DISPLAY=:99.0
+        - /sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -screen 0 1280x720x24 -ac +extension GLX
+        - PYTHON=python3 make deb
+        - dpkg -I ont-epi2melabs-launcher*.deb
+    artifacts:
+        paths:
+            - "ont-epi2melabs-launcher*.deb"
+
+.xenial: &xenial
+    <<: *build
+    variables:
+        IMAGEUSED: ${IMAGE}:16.04
+    
+.bionic: &bionic
+    <<: *build
+    variables:
+        IMAGEUSED: ${IMAGE}:18.04
+        
+xenial-deb:
+    <<: *xenial
+    except:
+        - tags
+        
+bionic-deb:
+    <<: *bionic
+    except:
+        - tags
+
+.setup-tag: &tag
+    before_script:
+        - IFS='.' read -ra PARTS <<< "${CI_COMMIT_TAG}"
+        - export MAJOR=${PARTS[0]:1}
+        - export MINOR=${PARTS[1]}
+        - export SUB=${PARTS[2]}
+        - echo -e "\e[1m\e[34mTagging with '\e[35m$MAJOR.$MINOR.$SUB\e[34m'\e[0m"
+    only:
+        - /^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$/
+    except:
+        - branches
+
+xenial-amd64-tag:
+    <<: *xenial
+    <<: *tag
+
+bionic-amd64-tag:
+    <<: *bionic
+    <<: *tag
+
+push-debs:
+    stage: push
+    image: ${IMAGE}:16.04
+    script:
+        - eval $(ssh-agent -s)
+        - ssh-add <(echo "${SSH_PRIVATE_KEY}")
+        - for CODENAME in xenial bionic; do scp -o StrictHostKeyChecking=no *.deb ${DEBREPO}:/var/www/apt/${CODENAME}-stable; done
+    only:
+        - tags
+        - /^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$/
