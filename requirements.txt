@@ -4,6 +4,6 @@ Kivy==1.11.1
 Kivy-Garden==0.1.4
 PyInstaller==3.6
 pyperclip==1.7.0
-requests==2.18.4
+requests==2.20.0
 semver==2.9.1
 setuptools < 45
