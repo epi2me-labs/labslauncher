@@ -110,7 +110,7 @@
             OurButton:
                 id: updatebtn
                 text: "Update"
-                on_release: root.update_server
+                on_release: root.update_server()
                 # TODO: can_update could be a property to bind
                 disabled: not app.can_update
             OurButton:
