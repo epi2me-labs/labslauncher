@@ -158,19 +158,12 @@ class StartScreen(Screen):
         thread.daemon = True
         thread.start()
         # ...wait for pull to finish
-        prog = r'|/-\|-/-'
-        pi = 0
-        font = self.startbtn.font_name
-        self.startbtn.font_name = "RobotoMono-Regular"
         while self.app.image is None:
             time.sleep(1)
-            symbol = prog[pi % len(prog)]
-            pi += 1
-            self.startbtn.text = "Download...{}".format(symbol)
+            self.containerlbl.text = \
+                "Start server (downloading...{})".format(self.app.download)
         # pull finished
         self.containerlbl.text = "Start server"
-        self.startbtn.text = "Start"
-        self.startbtn.font_name = font
         self.startbtn.disabled = False
         self.updatebtn.disabled = not self.app.can_update
         self.backbtn.disabled = False
