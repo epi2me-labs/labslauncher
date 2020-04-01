@@ -34,6 +34,7 @@ class LabsLauncherApp(App):
 
     cstatus = StringProperty('unknown')
     address = StringProperty('unavailable')
+    download = StringProperty('unknown')
 
     def __init__(self, *args, **kwargs):
         """Initialize the application."""
@@ -187,6 +188,22 @@ class LabsLauncherApp(App):
         self.set_status()
 
     def pull_tag(self, tag):
-        """Pull an image tag."""
-        name = "{}:{}".format(self.conf.CONTAINER, tag)
-        return self.docker.images.pull(name)
+        """Pull an image tag.
+
+        :param tag: tag to fetch.
+
+        :returns: the image object.
+
+        """
+        image_tag = util.get_image_tag(self.conf.CONTAINER, tag)
+        total = image_tag['full_size']
+
+        # to get feedback we need to use the low-level API
+        self.download = '{:.1f}%'.format(0)
+        for current, total in util.pull_with_progress(
+                self.conf.CONTAINER, tag):
+            self.download = '{:.1f}%'.format(100 * current / total)
+        self.download = "100%"
+        image = self.docker.images.get(
+            '{}:{}'.format(self.conf.CONTAINER, tag))
+        return image
