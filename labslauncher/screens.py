@@ -139,7 +139,7 @@ class StartScreen(Screen):
 
         self.app.start_container(
             self.datamount_input.text, self.token_input.text,
-            int(self.port_input.text))
+            self.port_input.text)
         if self.cstatus == "running":
             self.goto_home()
 

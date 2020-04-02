@@ -1,5 +1,5 @@
 """LabsLauncher Application."""
-
+import os
 import sys
 
 import docker
@@ -11,6 +11,8 @@ import kivy  # noqa: I100  kivy requires Config needs to be first
 from kivy.app import App
 from kivy.config import Config
 from kivy.properties import StringProperty
+from kivy.uix.label import Label
+from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import ScreenManager
 from pkg_resources import resource_filename
 
@@ -155,6 +157,28 @@ class LabsLauncherApp(App):
             cont.remove()
         self.set_status()
 
+    @staticmethod
+    def check_inputs(mount, token, port):
+        """Create popup warning box if mount/token/port are invalid."""
+        msg = None
+        if not os.path.exists(mount):
+            msg = "Mount path does not exist"
+        elif not token:
+            msg = "Please enter a value for 'Token'"
+        elif not port:
+            msg = "Port must be a number."
+        elif token.isnumeric():
+            msg = "Token must contain letters"
+        if msg is not None:
+            popup = Popup(
+                title='Invalid Settings:',
+                content=Label(text=msg, shorten=True),
+                size_hint=(0.9, 0.5))
+            popup.open()
+            return False
+        else:
+            return True
+
     def start_container(self, mount, token, port):
         """Start the server container, removing a previous one if necessary.
 
@@ -162,8 +186,10 @@ class LabsLauncherApp(App):
             the image is not available locally. To ensure more controlled
             behaviour check .get_image() first.
         """
-        self.clear_container()
+        if not self.check_inputs(mount, token, port):
+            return
 
+        self.clear_container()
         # colab requires the port in the container to be equal
         CMD = self.conf.CONTAINERCMD + [
             "--NotebookApp.token={}".format(token),
