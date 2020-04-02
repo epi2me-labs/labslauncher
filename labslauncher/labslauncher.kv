@@ -93,12 +93,17 @@
                 text: "token"
             TextInput:
                 id: token_input
+                multiline: False
+                input_filter: lambda token, from_undo: token[:10 - len(self.text)]
+                on_text_validate: port_input.focus = True
                 text: app.conf.LABSTOKEN
         ButtonRow:
             Label:
                 text: "port"
             TextInput:
                 id: port_input
+                multiline: False
+                input_filter: "int"
                 text: str(app.conf.PORTHOST)
         Label:
         ButtonRow:
