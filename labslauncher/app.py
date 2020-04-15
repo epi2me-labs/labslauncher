@@ -16,6 +16,7 @@ from kivy.uix.label import Label
 from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import ScreenManager
 from pkg_resources import resource_filename
+from requests.exceptions import ConnectionError
 
 from labslauncher import LauncherConfig, screens, util
 
@@ -27,13 +28,26 @@ iconfonts.register(
     resource_filename('labslauncher', 'fontawesome.fontd'))
 
 
+class SpecialDocker(docker.client.DockerClient):
+    """Wrapper around docker client class to add a method."""
+
+    @property
+    def is_running(self):
+        """Bool for is docker is running or not."""
+        try:
+            self.from_env().version()
+            return True
+        except ConnectionError:
+            return False
+
+
 def main():
     """Entry point for application."""
     app = LabsLauncherApp()
     if '--latest' in sys.argv:
         # money patch to run 'latest' container
-        app.im_request = 'latest'
-        app.set_image()
+        app.current_image_tag('latest')
+        app.safe_fetch_local_image()
     app.run()
 
 
@@ -47,20 +61,39 @@ class LabsLauncherApp(App):
     def __init__(self, *args, **kwargs):
         """Initialize the application."""
         super().__init__(**kwargs)
-        self.docker = docker.from_env()
         self.conf = LauncherConfig()
+        self.__current_image_tag = None
+        self.__image = None
+        if self.docker_is_running:
+            r = self.fetch_latest_remote_tag()
+            self.__current_image_tag = r if r else self.dockerhub_image_tags[0]
 
-        # a list of all tags on dockerhub
-        self.im_tags = util.get_image_tags(self.conf.CONTAINER)
-        # the newest tag available locally
-        self.im_request = util.newest_tag(
-            self.conf.CONTAINER, tags=self.im_tags, client=self.docker)
-        if self.im_request is None:
-            # nothing available, request newest
-            self.im_request = self.im_tags[0]
-        # set self.image to the newest local image, or None
-        # if nothing available
-        self.set_image()
+        self.safe_fetch_local_image()
+
+    @property
+    def dockerhub_image_tags(self):
+        """All available image tags on dockerhub."""
+        return util.get_image_tags(self.conf.CONTAINER)
+
+    @property
+    def docker(self):
+        """Local docker instance."""
+        return SpecialDocker.from_env()
+
+    @staticmethod
+    def docker_not_running_popup():
+        """Create popup if docker service cannot be contacted."""
+        msg = "Could not connect to docker."
+        popup = Popup(
+            title='Error:',
+            content=Label(text=msg, shorten=True),
+            size_hint=(0.9, 0.5))
+        popup.open()
+
+    @property
+    def docker_is_running(self):
+        """Check if docker is running or not."""
+        return self.docker.is_running
 
     def build(self):
         """Build the application."""
@@ -73,32 +106,63 @@ class LabsLauncherApp(App):
         for screen in ('home', 'start'):
             self.bind(cstatus=self.sm.get_screen(screen).setter('cstatus'))
         self.bind(address=self.sm.get_screen('home').setter('address'))
-        self.set_status()
+        if self.docker_is_running:
+            self.set_status()
+        else:
+            self.cstatus = "Docker not running"
         return self.sm
 
     @property
     def image_name(self):
         """Return the image name for the requested tag."""
-        if self.im_request is None:
-            raise ValueError("No local tag available.")
-        return "{}:{}".format(self.conf.CONTAINER, self.im_request)
+        if self.current_image_tag is None:
+            raise ValueError("No local tag.")
+        return "{}:{}".format(self.conf.CONTAINER, self.current_image_tag)
 
-    def get_image(self):
+    def fetch_latest_remote_tag(self):
+        """Scrape the latest remote tag for the chosen image from dockerhub."""
+        return util.newest_tag(self.conf.CONTAINER,
+                               tags=self.dockerhub_image_tags,
+                               client=self.docker)
+
+    @property
+    def current_image_tag(self):
+        """Get the current image tag."""
+        if self.__current_image_tag is None and self.docker_is_running:
+            self.__current_image_tag = self.fetch_latest_remote_tag()
+        return self.__current_image_tag
+
+    @current_image_tag.setter
+    def current_image_tag(self, tag):
+        """Change the current image tag."""
+        self.__current_image_tag = tag
+
+    def fetch_local_image(self):
         """Get the docker image."""
         try:
             return self.docker.images.get(self.image_name)
         except Exception:
             raise docker.errors.ImageNotFound("No local image available.")
 
-    def set_image(self):
+    def safe_fetch_local_image(self):
         """Set image attribute of this class.
 
         If the image is not found locally sets `None`.
         """
         try:
-            self.image = self.get_image()
+            self.image = self.fetch_local_image()
         except docker.errors.ImageNotFound:
             self.image = None
+
+    @property
+    def image(self):
+        """Get the docker image object used by the app."""
+        return self.__image
+
+    @image.setter
+    def image(self, image):
+        """Set the docker image object used by the app."""
+        self.__image = image
 
     def ensure_image(self):
         """Set image attribute of this class.
@@ -107,27 +171,28 @@ class LabsLauncherApp(App):
         """
         self.image = None
         try:
-            self.image = self.get_image()
+            self.image = self.fetch_local_image()
         except docker.errors.ImageNotFound:
-            self.image = self.pull_tag(self.im_request)
+            self.image = self.pull_tag(self.current_image_tag)
 
     @property
     def can_update(self):
         """Determine if an updated image is available."""
-        return self.im_tags[0] != self.im_request
+        return self.dockerhub_image_tags[0] != self.current_image_tag
 
     def update_image(self):
         """Update the image to the newest tag."""
         self.image = None
-        self.im_request = self.im_tags[0]
+        self.current_image_tag = self.dockerhub_image_tags[0]
         self.ensure_image()
 
     @property
     def container(self):
         """Return the server container if one is present, else None."""
-        for cont in self.docker.containers.list(True):
-            if cont.name == self.conf.SERVER_NAME:
-                return cont
+        if self.docker_is_running:
+            for cont in self.docker.containers.list(True):
+                if cont.name == self.conf.SERVER_NAME:
+                    return cont
         return None
 
     def set_status(self):
@@ -150,8 +215,7 @@ class LabsLauncherApp(App):
                     port = int(c.split('=')[1])
                 elif c.startswith('--NotebookApp.token='):
                     token = c.split('=')[1]
-            new_address = "http://localhost:{}?token={}".format(
-                port, token)
+            new_address = "http://localhost:{}?token={}".format(port, token)
         self.address = new_address
 
     def clear_container(self, *args):
@@ -190,7 +254,7 @@ class LabsLauncherApp(App):
 
         .. note:: The behaviour of docker.run is that a pull will be invoked if
             the image is not available locally. To ensure more controlled
-            behaviour check .get_image() first.
+            behaviour check .fetch_local_image() first.
         """
         if not self.check_inputs(mount, token, port):
             return

@@ -73,7 +73,9 @@
             OurButton:
                 id: startbtn
                 text: "Start"
-                on_press: root.goto_start_settings()
+                on_release:
+                    if app.docker_is_running: root.goto_start_settings()
+                    else: app.docker_not_running_popup()
             OurButton:
                 id: stopbtn
                 text: "Stop"
@@ -189,12 +191,15 @@
             OurButton:
                 id: startbtn
                 text: "Start"
-                on_release: root.start_server()
+                on_release:
+                    if app.docker_is_running: root.start_server()
+                    else: app.docker_not_running_popup()
             OurButton:
                 id: updatebtn
                 text: "Update"
-                on_release: root.update_server()
-                # TODO: can_update could be a property to bind
+                on_release:
+                    if app.docker_is_running: root.update_server()
+                    else: app.docker_not_running_popup()
                 disabled: not app.can_update
             OurButton:
                 id: backbtn
