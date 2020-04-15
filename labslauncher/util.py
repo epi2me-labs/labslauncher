@@ -58,7 +58,7 @@ def get_image_tag(image, tag):
         name = t['name']
         if name == tag:
             return t
-    raise IndexError("Tag was not found.")
+    raise IndexError("Tag was not found: \"{}\"".format(tag))
 
 
 def newest_tag(image, tags=None, client=None):
