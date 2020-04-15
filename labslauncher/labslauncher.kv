@@ -58,9 +58,15 @@
     addrbtn: addrbtn
     BoxLayout:
         orientation: "vertical"
-        BoxLayout:
+        AnchorLayout:
+            anchor_x: 'center'
+            anchor_y: 'center'
             Image:
-                source: filename("labslauncher", "epi2me.ico")
+                source: filename("labslauncher", "EPI2ME_labs_logo_RGB_negative_large.png")
+                size: 150, 100
+                size_hint: 0.9, 0.9
+                keep_ratio: True
+                allow_stretch: False
         ButtonRow:
             Label:
                 # just to pad
