@@ -10,6 +10,7 @@ Config.set('graphics', 'height', 400)
 import kivy  # noqa: I100  kivy requires Config needs to be first
 from kivy.app import App
 from kivy.config import Config
+from kivy.garden import iconfonts
 from kivy.properties import StringProperty
 from kivy.uix.label import Label
 from kivy.uix.popup import Popup
@@ -18,7 +19,12 @@ from pkg_resources import resource_filename
 
 from labslauncher import LauncherConfig, screens, util
 
+
 kivy.require('1.11.1')
+iconfonts.register(
+    'default_font',
+    resource_filename('labslauncher', 'fontawesome-webfont.ttf'),
+    resource_filename('labslauncher', 'fontawesome.fontd'))
 
 
 def main():

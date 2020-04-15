@@ -40,7 +40,7 @@ a = Entrypoint(
     hiddenimports=['cython'],
     datas=[
         ('labslauncher/{}'.format(x), 'labslauncher')
-        for x in ['labslauncher.kv', 'epi2me.ico']]
+        for x in ['labslauncher.kv', 'epi2me.ico', 'fontawesome-webfont.ttf', 'fontawesome.fontd']]
 ) 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(

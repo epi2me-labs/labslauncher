@@ -2,11 +2,43 @@
 #: import join os.path.join
 #: import isdir os.path.isdir
 #: import filename pkg_resources.resource_filename
+#: import icon kivy.garden.iconfonts.icon
 
 <Copypopup@Popup>:
     auto_dismiss: True
     title: "Copied to clipboard"
-    size_hint: 0.5, 0.5
+    size_hint: 0.8, 0.6
+    Label:
+        text_size: self.size
+        valign: 'top'
+        text: "The server address has been copied to your clipboard, it can now be used in your web browser to connect Colab to your notebook server. See the Welcome page for more details."
+
+<DatapathHelp@Popup>:
+    auto_dismiss: True
+    title: "Data path"
+    size_hint: 0.8, 0.6
+    Label:
+        text_size: self.size
+        valign: 'top'
+        text: "The data path is the location on your computer you wish to be readable (and writeable) within the notebook environment. It will be available in the environment under `/epi2melabs`."
+
+<TokenHelp@Popup>:
+    auto_dismiss: True
+    title: "Secret token"
+    size_hint: 0.8, 0.6
+    Label:
+        text_size: self.size
+        valign: 'top'
+        text: "A secret token used to connect to the notebook server. Anyone with this token will be able to connect to the server, and therefore modify files under the data location."
+
+<PortHelp@Popup>:
+    auto_dismiss: True
+    title: "Network Port"
+    size_hint: 0.8, 0.6
+    Label:
+        text_size: self.size
+        valign: 'top'
+        text: "The network port to used to communicate between web-browser and notebook server."
 
 <OurButton@Button>:
     size: 100, 40
@@ -80,31 +112,71 @@
                 id: containerlbl
                 text: "Start server"
         ButtonRow:
-            Button:
+            Label:
+            OurButton:
                 id: datamount_input
                 text: 'Select path'
                 on_release: root.show_load()
             TextInput:
+                size: root.width / 2, 40
+                size_hint: None, None
                 id: datamount_input
                 text: root.chosen_path
                 disabled: True
+            Label:
+                size: 30, 40
+                size_hint: None, None
+                text: "[ref=click]{}[/ref]".format(icon('fa-info-circle'))
+                markup: True
+                on_ref_press: Factory.DatapathHelp().open()
+            Label:
         ButtonRow:
             Label:
-                text: "token"
+            Label:
+                size: 100, 40
+                size_hint: None, None
+                text_size: self.size
+                halign: 'right'
+                valign: 'center'
+                text: "token:"
             TextInput:
                 id: token_input
+                size: root.width / 2, 40
+                size_hint: None, None
                 multiline: False
                 input_filter: lambda token, from_undo: token[:10 - len(self.text)]
                 on_text_validate: port_input.focus = True
                 text: app.conf.LABSTOKEN
+            Label:
+                size: 30, 40
+                size_hint: None, None
+                text: "[ref=click]{}[/ref]".format(icon('fa-info-circle'))
+                markup: True
+                on_ref_press: Factory.TokenHelp().open()
+            Label:
         ButtonRow:
             Label:
-                text: "port"
+            Label:
+                size: 100, 40
+                size_hint: None, None
+                text_size: self.size
+                halign: 'right'
+                valign: 'center'
+                text: "port:"
             TextInput:
                 id: port_input
+                size: root.width / 2, 40
+                size_hint: None, None
                 multiline: False
                 input_filter: "int"
                 text: str(app.conf.PORTHOST)
+            Label:
+                size: 30, 40
+                size_hint: None, None
+                text: "[ref=click]{}[/ref]".format(icon('fa-info-circle'))
+                markup: True
+                on_ref_press: Factory.PortHelp().open()
+            Label:
         Label:
         ButtonRow:
             Label:
