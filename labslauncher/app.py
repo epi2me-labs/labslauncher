@@ -97,7 +97,7 @@ class LabsLauncherApp(App):
     def build(self):
         """Build the application."""
         self.icon = resource_filename('labslauncher', 'epi2me.ico')
-        self.title = "Epi2MeLabs Launcher"
+        self.title = "EPI2ME-Labs Launcher"
         self.sm = ScreenManager()
         self.sm.add_widget(screens.HomeScreen(name='home'))
         self.sm.add_widget(screens.StartScreen(name='start'))
