@@ -79,7 +79,9 @@
             OurButton:
                 id: stopbtn
                 text: "Stop"
-                on_release: app.clear_container()
+                on_release:
+                    if app.docker_is_running: app.clear_container()
+                    else: app.docker_not_running_popup()
             Label:
                 # just to pad
         BoxLayout:
