@@ -249,7 +249,7 @@ class LabsLauncherApp(App):
         else:
             return True
 
-    def start_container(self, mount, token, port):
+    def start_container(self, mount, token, port, host_only=True):
         """Start the server container, removing a previous one if necessary.
 
         .. note:: The behaviour of docker.run is that a pull will be invoked if
@@ -267,11 +267,14 @@ class LabsLauncherApp(App):
             ]
 
         try:
+            ports = {int(port): int(port)}
+            if host_only:
+                ports = {int(port): ('127.0.0.1', int(port))}
             self.docker.containers.run(
                 self.image_name,
                 CMD,
                 detach=True,
-                ports={int(port): int(port)},
+                ports=ports,
                 environment=['JUPYTER_ENABLE_LAB=yes'],
                 volumes={
                     mount: {
