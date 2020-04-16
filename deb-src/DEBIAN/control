@@ -4,6 +4,6 @@ Section: science
 Priority: optional
 Architecture: amd64
 Source: PROJECT
-Depends: 
+Depends: xsel,xclip
 Maintainer: Oxford Nanopore Technologies
 Description: EPI2ME-Labs Server Manager
