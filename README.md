@@ -1,6 +1,6 @@
 # ont-labslauncher
 
-Epi2Me Labs Server Control created by *cwright*
+EPI2ME Labs Server Controller.
 
 Requirements:
 * python3
@@ -8,7 +8,7 @@ Requirements:
 * virtualenv
 * make
 
-The last two are not strictly required to simply build and run the application
+The last two are not strictly required to build and run the application
 but are helpful for development
 
 ## Quick-start

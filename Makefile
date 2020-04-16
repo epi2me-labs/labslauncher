@@ -33,9 +33,9 @@ test: venv/bin/activate
 		--import-order-style google --application-import-names labslauncher \
 		--statistics --per-file-ignores='labslauncher/app.py:E402'
 
-dist/Epi2MeLabs-Launcher: venv/bin/activate
+dist/EPI2ME-Labs-Launcher: venv/bin/activate
 	${IN_VENV} && python setup.py develop
-	${IN_VENV} && pyinstaller Epi2MeLabs-Launcher.spec
+	${IN_VENV} && pyinstaller EPI2ME-Labs-Launcher.spec
 
 
 .PHONY: run
@@ -44,7 +44,7 @@ run: venv/bin/activate
 
 
 .PHONY: build
-build: dist/Epi2MeLabs-Launcher
+build: dist/EPI2ME-Labs-Launcher
 
 
 .PHONY: clean
@@ -52,10 +52,10 @@ clean:
 	rm -rf __pycache__ dist build venv labslauncher.egg-info tmp *.deb
 
 
-deb: clean dist/Epi2MeLabs-Launcher
+deb: clean dist/EPI2ME-Labs-Launcher
 	mkdir -p deb-src/usr/local/bin
 	mkdir -p deb-src/usr/share/applications
-	cp dist/Epi2MeLabs-Launcher deb-src/usr/local/bin/
+	cp dist/EPI2ME-Labs-Launcher deb-src/usr/local/bin/
 	cp labslauncher.desktop deb-src/usr/share/applications
 	cp -rp deb-src/ tmp/
 	$(SEDI) "s/PROJECT/$(PROJECT)/g"   tmp/DEBIAN/control

@@ -45,7 +45,7 @@ a = Entrypoint(
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz, a.scripts, a.binaries, a.zipfiles, a.datas, [],
-    name='Epi2MeLabs-Launcher',
+    name='EPI2ME-Labs-Launcher',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
