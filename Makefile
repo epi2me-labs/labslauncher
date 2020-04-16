@@ -23,7 +23,6 @@ venv/bin/activate:
 	test -d venv || virtualenv venv --python=$(PYTHON) --prompt "(build) "
 	${IN_VENV} && pip install pip --upgrade
 	${IN_VENV} && pip install -r requirements.txt
-	${IN_VENV} && garden install --app iconfonts
 
 testenv: venv/bin/activate
 
