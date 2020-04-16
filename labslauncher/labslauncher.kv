@@ -29,7 +29,7 @@
     Label:
         text_size: self.size
         valign: 'top'
-        text: "A secret token used to connect to the notebook server. Anyone with this token will be able to connect to the server, and therefore modify files under the data location."
+        text: "A secret token used to connect to the notebook server. Anyone with this token will be able to connect to the server, and therefore modify files under the data location. We recommend changing this from the default value."
 
 <PortHelp@Popup>:
     auto_dismiss: True
@@ -154,7 +154,7 @@
                 size: root.width / 2, 40
                 size_hint: None, None
                 multiline: False
-                input_filter: lambda token, from_undo: token[:10 - len(self.text)]
+                input_filter: lambda token, from_undo: token[:16 - len(self.text)]
                 on_text_validate: port_input.focus = True
                 text: app.conf.LABSTOKEN
             Label:
