@@ -56,6 +56,7 @@ deb: clean dist/EPI2ME-Labs-Launcher
 	mkdir -p deb-src/usr/share/applications
 	cp dist/EPI2ME-Labs-Launcher deb-src/usr/local/bin/
 	cp labslauncher.desktop deb-src/usr/share/applications
+	cp labslauncher/EPI2ME.png deb-src/usr/share/applications
 	cp -rp deb-src/ tmp/
 	$(SEDI) "s/PROJECT/$(PROJECT)/g"   tmp/DEBIAN/control
 	$(SEDI) "s/MAJOR/$(MAJOR)/g"       tmp/DEBIAN/control
