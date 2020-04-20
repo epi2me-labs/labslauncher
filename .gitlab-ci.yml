@@ -77,7 +77,7 @@ push-debs:
     <<: *setup-deb-push
     stage: push
     script:
-        - for CODENAME in xenial bionic; do scp -o StrictHostKeyChecking=no ${CODENAME}.deb ${DEBREPO}:/var/www/apt/${CODENAME}-stable; done
+        - for CODENAME in xenial bionic; do scp -o StrictHostKeyChecking=no *${CODENAME}.deb ${DEBREPO}:/var/www/apt/${CODENAME}-stable; done
     only:
         - /^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$/
 
