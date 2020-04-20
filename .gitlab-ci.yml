@@ -2,6 +2,7 @@ stages:
     - test
     - build
     - push
+    - publish
 
 test:
     image: ${IMAGE}:16.04
@@ -27,6 +28,8 @@ test:
     artifacts:
         paths:
             - "ont-epi2melabs-launcher*.deb"
+    except:
+        - tags
 
 .xenial: &xenial
     <<: *build
@@ -40,13 +43,9 @@ test:
         
 xenial-deb:
     <<: *xenial
-    except:
-        - tags
         
 bionic-deb:
     <<: *bionic
-    except:
-        - tags
 
 .setup-tag: &tag
     before_script:
@@ -68,13 +67,28 @@ bionic-amd64-tag:
     <<: *bionic
     <<: *tag
 
-push-debs:
-    stage: push
+.setup-deb-push: &setup-deb-push
     image: ${IMAGE}:16.04
-    script:
+    before_script:
         - eval $(ssh-agent -s)
         - ssh-add <(echo "${SSH_PRIVATE_KEY}")
-        - for CODENAME in xenial bionic; do scp -o StrictHostKeyChecking=no *.deb ${DEBREPO}:/var/www/apt/${CODENAME}-stable; done
+
+push-debs:
+    <<: *setup-deb-push
+    stage: push
+    script:
+        - for CODENAME in xenial bionic; do scp -o StrictHostKeyChecking=no ${CODENAME}.deb ${DEBREPO}:/var/www/apt/${CODENAME}-stable; done
     only:
-        - tags
         - /^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$/
+
+push-external:
+    <<: *setup-deb-push
+    stage: publish
+    script:
+        - for CODENAME in xenial bionic; do scp -o StrictHostKeyChecking=no *${CODENAME}.deb ${EXTERNALDEBREPO}:/mirror/apt/incoming/${CODENAME}-stable; done
+    dependencies:
+        - xenial-amd64-tag
+        - bionic-amd64-tag
+    only:
+        - /^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$/
+    when: manual
