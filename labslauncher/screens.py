@@ -1,5 +1,6 @@
 """Kivy Screens for the labslauncher application."""
 
+import os
 from threading import Thread
 import time
 import webbrowser
@@ -123,7 +124,10 @@ class StartScreen(Screen):
 
     def load(self, path, filename):
         """Set the data path."""
-        self.data_mount = path
+        if os.path.isdir(filename[0]):
+            self.data_mount = filename[0]
+        else:
+            self.data_mount = path
         self._popup.dismiss()
 
     def goto_home(self, *args):
