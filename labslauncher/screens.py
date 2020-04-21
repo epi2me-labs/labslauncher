@@ -55,7 +55,7 @@ class HomeScreen(Screen):
 
     def open_colab(self, *args):
         """Open our Google Colab landing page."""
-        webbrowser.open(self.app.conf.COLABLINK)
+        webbrowser.open(self.app.get_config('colab_link'))
 
     def goto_start_settings(self, *args):
         """Move GUI to start container screen."""
