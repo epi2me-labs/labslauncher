@@ -14,7 +14,7 @@ but are helpful for development
 ## Quick-start
 
 ```bash
-git clone git@git.oxfordnanolabs.local:custflow/labslauncher.git
+git clone https://github.com/epi2me-labs/labslauncher.git
 cd labslauncher
 make run
 ```
