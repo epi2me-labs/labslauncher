@@ -73,14 +73,18 @@ class StartScreen(Screen):
     """Screen for starting and updating the server."""
 
     cstatus = StringProperty('unknown')
-    chosen_path = StringProperty('')
+    data_mount = StringProperty('')
+    token = StringProperty('')
+    port = StringProperty('')
 
     def __init__(self, **kwargs):
         """Initialize start screen."""
         super().__init__(**kwargs)
 
         self.app = App.get_running_app()
-        self.chosen_path = self.app.conf.DATAMOUNT
+        self.data_mount = self.app.get_config("data_mount")
+        self.token = self.app.get_config("token")
+        self.port = self.app.get_config("port")
         self.image = None
 
     def on_cstatus(self, *args):
@@ -96,6 +100,18 @@ class StartScreen(Screen):
         self.startbtn.text = start_text
         self.containerlbl.text = 'Start server{}'.format(msg)
 
+    def on_data_mount(self, *args):
+        """Set config on data_mount property change."""
+        self.app.set_config("data_mount", self.data_mount)
+
+    def on_token(self, *args):
+        """Set config on token property change."""
+        self.app.set_config("token", self.token)
+
+    def on_port(self, *args):
+        """Set config on port property change."""
+        self.app.set_config("port", self.port)
+
     def show_load(self):
         """Show the directory browser."""
         content = LoadDialog(load=self.load)
@@ -107,7 +123,7 @@ class StartScreen(Screen):
 
     def load(self, path, filename):
         """Set the data path."""
-        self.chosen_path = path
+        self.data_mount = path
         self._popup.dismiss()
 
     def goto_home(self, *args):
@@ -117,6 +133,9 @@ class StartScreen(Screen):
 
     def start_server(self, *args):
         """Start the server container."""
+        self.data_mount = self.ids.datamount_input.text
+        self.token = self.ids.token_input.text
+        self.port = self.ids.port_input.text
         thread = Thread(target=self._start)
         thread.daemon = True
         thread.start()
@@ -138,8 +157,7 @@ class StartScreen(Screen):
             self._pull_image()
 
         self.app.start_container(
-            self.datamount_input.text, self.token_input.text,
-            self.port_input.text)
+            self.data_mount, self.token, self.port)
         if self.cstatus == "running":
             self.goto_home()
 
