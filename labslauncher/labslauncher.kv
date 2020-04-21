@@ -131,7 +131,7 @@
                 size: root.width / 2, 40
                 size_hint: None, None
                 id: datamount_input
-                text: root.chosen_path
+                text: root.data_mount
                 disabled: True
             Label:
                 size: 30, 40
@@ -156,7 +156,7 @@
                 multiline: False
                 input_filter: lambda token, from_undo: token[:16 - len(self.text)]
                 on_text_validate: port_input.focus = True
-                text: app.conf.LABSTOKEN
+                text: root.token
             Label:
                 size: 30, 40
                 size_hint: None, None
@@ -179,7 +179,7 @@
                 size_hint: None, None
                 multiline: False
                 input_filter: "int"
-                text: str(app.conf.PORTHOST)
+                text: root.port
             Label:
                 size: 30, 40
                 size_hint: None, None

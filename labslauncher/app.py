@@ -9,15 +9,17 @@ Config.set('graphics', 'width', 400)
 Config.set('graphics', 'height', 400)
 import kivy  # noqa: I100  kivy requires Config needs to be first
 from kivy.app import App
-from kivy.config import Config
+from kivy.logger import Logger
 from kivy.properties import StringProperty
 from kivy.uix.label import Label
 from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import ScreenManager
+from kivy.uix.settings import SettingsWithTabbedPanel
 from pkg_resources import resource_filename
 from requests.exceptions import ConnectionError
 
-from labslauncher import iconfonts, LauncherConfig, screens, util
+import labslauncher
+from labslauncher import iconfonts, screens, util
 
 
 kivy.require('1.11.1')
@@ -59,20 +61,75 @@ class LabsLauncherApp(App):
 
     def __init__(self, *args, **kwargs):
         """Initialize the application."""
-        super().__init__(**kwargs)
-        self.conf = LauncherConfig()
+        self.defaults = labslauncher.Settings()
+        super().__init__(*args, **kwargs)
+
+    def get_application_config(self):
+        """Return location of application configuration file."""
+        return super().get_application_config(
+            '~/.%(appname)s.ini')
+
+    def build(self):
+        """Build the application."""
+        self.settings_cls = SettingsWithTabbedPanel
+        self.icon = resource_filename('labslauncher', 'epi2me.ico')
+        self.title = "EPI2ME-Labs Launcher"
+
         self.__current_image_tag = None
         self.__image = None
         if self.docker_is_running:
             r = self.fetch_latest_remote_tag()
             self.__current_image_tag = r if r else self.dockerhub_image_tags[0]
-
         self.safe_fetch_local_image()
+
+        self.sm = ScreenManager()
+        self.sm.add_widget(screens.HomeScreen(name='home'))
+        self.sm.add_widget(screens.StartScreen(name='start'))
+
+        for screen in ('home', 'start'):
+            self.bind(cstatus=self.sm.get_screen(screen).setter('cstatus'))
+        self.bind(address=self.sm.get_screen('home').setter('address'))
+        if self.docker_is_running:
+            self.set_status()
+        else:
+            self.cstatus = "Docker not running"
+        return self.sm
+
+    def build_config(self, config):
+        """Set the default values for the config."""
+        self.use_kivy_settings = False
+        config.read(self.get_application_config())
+        defaults = {obj["key"]: obj["default"] for obj in self.defaults}
+        config.setdefaults(self.defaults.section, defaults)
+
+    def build_settings(self, settings):
+        """Add custom section to the default configuration object."""
+        settings = labslauncher.Settings()
+        settings.add_json_panel(
+            'Settings', self.config, data=settings.kivy_json)
+
+    def get_config(self, key):
+        """Get a config item.
+
+        :param key: the item name.
+
+        """
+        return self.config.get(self.defaults.section, key)
+
+    def set_config(self, key, value):
+        """Set a config item.
+
+        :param key: the item name.
+        :param value: new value of item.
+
+        """
+        self.config.set(self.defaults.section, key, value)
+        self.config.write()
 
     @property
     def dockerhub_image_tags(self):
         """All available image tags on dockerhub."""
-        return util.get_image_tags(self.conf.CONTAINER)
+        return util.get_image_tags(self.get_config("container"))
 
     @property
     def docker(self):
@@ -94,33 +151,17 @@ class LabsLauncherApp(App):
         """Check if docker is running or not."""
         return self.docker.is_running
 
-    def build(self):
-        """Build the application."""
-        self.icon = resource_filename('labslauncher', 'epi2me.ico')
-        self.title = "EPI2ME-Labs Launcher"
-        self.sm = ScreenManager()
-        self.sm.add_widget(screens.HomeScreen(name='home'))
-        self.sm.add_widget(screens.StartScreen(name='start'))
-
-        for screen in ('home', 'start'):
-            self.bind(cstatus=self.sm.get_screen(screen).setter('cstatus'))
-        self.bind(address=self.sm.get_screen('home').setter('address'))
-        if self.docker_is_running:
-            self.set_status()
-        else:
-            self.cstatus = "Docker not running"
-        return self.sm
-
     @property
     def image_name(self):
         """Return the image name for the requested tag."""
         if self.current_image_tag is None:
             raise ValueError("No local tag.")
-        return "{}:{}".format(self.conf.CONTAINER, self.current_image_tag)
+        return "{}:{}".format(
+            self.get_config("container"), self.current_image_tag)
 
     def fetch_latest_remote_tag(self):
         """Scrape the latest remote tag for the chosen image from dockerhub."""
-        return util.newest_tag(self.conf.CONTAINER,
+        return util.newest_tag(self.get_config("container"),
                                tags=self.dockerhub_image_tags,
                                client=self.docker)
 
@@ -190,7 +231,7 @@ class LabsLauncherApp(App):
         """Return the server container if one is present, else None."""
         if self.docker_is_running:
             for cont in self.docker.containers.list(True):
-                if cont.name == self.conf.SERVER_NAME:
+                if cont.name == self.get_config("server_name"):
                     return cont
         return None
 
@@ -248,27 +289,29 @@ class LabsLauncherApp(App):
         else:
             return True
 
-    def start_container(self, mount, token, port, host_only=True):
+    def start_container(self, mount, token, port):
         """Start the server container, removing a previous one if necessary.
 
         .. note:: The behaviour of docker.run is that a pull will be invoked if
             the image is not available locally. To ensure more controlled
             behaviour check .fetch_local_image() first.
         """
+        host_only = self.get_config('docker_restrict')
         if not self.check_inputs(mount, token, port):
             return
 
         self.clear_container()
-        # colab requires the port in the container to be equal
-        CMD = self.conf.CONTAINERCMD + [
+        CMD = self.get_config("container_cmd").split() + [
             "--NotebookApp.token={}".format(token),
             "--port={}".format(port),
             ]
 
         try:
+            # note: colab requires the port in the container to be equal
             ports = {int(port): int(port)}
             if host_only:
                 ports = {int(port): ('127.0.0.1', int(port))}
+            Logger.info("Docker: {}".format(ports))
             self.docker.containers.run(
                 self.image_name,
                 CMD,
@@ -277,8 +320,8 @@ class LabsLauncherApp(App):
                 environment=['JUPYTER_ENABLE_LAB=yes'],
                 volumes={
                     mount: {
-                        'bind': self.conf.DATABIND, 'mode': 'rw'}},
-                name=self.conf.SERVER_NAME)
+                        'bind': self.get_config("data_bind"), 'mode': 'rw'}},
+                name=self.get_config("server_name"))
         except Exception as e:
             # TODO: better feedback on failure
             print(e)
@@ -293,15 +336,15 @@ class LabsLauncherApp(App):
         :returns: the image object.
 
         """
-        image_tag = util.get_image_tag(self.conf.CONTAINER, tag)
+        image_tag = util.get_image_tag(self.get_config("container"), tag)
         total = image_tag['full_size']
 
         # to get feedback we need to use the low-level API
         self.download = '{:.1f}%'.format(0)
         for current, total in util.pull_with_progress(
-                self.conf.CONTAINER, tag):
+                self.get_config("container"), tag):
             self.download = '{:.1f}%'.format(100 * current / total)
         self.download = "100%"
         image = self.docker.images.get(
-            '{}:{}'.format(self.conf.CONTAINER, tag))
+            '{}:{}'.format(self.get_config("container"), tag))
         return image
