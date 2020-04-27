@@ -2,6 +2,9 @@
 
 import functools
 import json
+import platform
+import socket
+import uuid
 
 import docker
 import requests
@@ -108,3 +111,42 @@ def pull_with_progress(image, tag):
                 layers[resp['id']] = resp["progressDetail"]["current"]
                 current = sum(layers.values())
                 yield current, total
+
+
+def _send_ping(data):
+    """Send a ping to home.
+
+    :param data: a dictionary containing the data to send (should be
+        json serializable).
+
+    :returns: status code of HTTP request.
+    """
+    url = 'https://ping.oxfordnanoportal.com/epilaby'
+    ping_version = '1.0.0'
+    ping = {
+        "tracking_id": {"msg_id": str(uuid.uuid4()), "version": ping_version},
+        "hostname": socket.gethostname(), "os": platform.platform()}
+    ping.update(data)
+    try:
+        r = requests.post(url, json=ping)
+    except Exception as e:
+        print(e)
+    return r.status_code
+
+
+def send_container_ping(action, container, image_name):
+    """Ping a status message of a container.
+
+    :param action: one of 'start' or 'stop'.
+    :param container: a docker `Container` object.
+    :param image_tag: the name of the image associated with the container.
+
+    :returns: status code of HTTP request.
+    """
+    allowed_status = {"start", "stop"}
+    if action not in allowed_status:
+        raise ValueError("`action` was not an allowed value.")
+    return _send_ping({
+        "action": action,
+        "container_data": container.stats(stream=False),
+        "image_data": image_name})

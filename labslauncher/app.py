@@ -49,6 +49,8 @@ def main():
         # money patch to run 'latest' container
         app.current_image_tag('latest')
         app.safe_fetch_local_image()
+    if '--no-pings' in sys.argv:
+        app.disable_pings = True
     app.run()
 
 
@@ -62,6 +64,7 @@ class LabsLauncherApp(App):
     def __init__(self, *args, **kwargs):
         """Initialize the application."""
         self.defaults = labslauncher.Settings()
+        self.disable_pings = False
         super().__init__(*args, **kwargs)
 
     def get_application_config(self):
@@ -262,6 +265,8 @@ class LabsLauncherApp(App):
         """Kill and remove the server container."""
         cont = self.container
         if cont is not None:
+            if not self.disable_pings:
+                util.send_container_ping('stop', cont, self.image_name)
             if cont.status == "running":
                 cont.kill()
             cont.remove()
@@ -327,6 +332,8 @@ class LabsLauncherApp(App):
             print(e)
             pass
         self.set_status()
+        if not self.disable_pings:
+            util.send_container_ping('start', self.container, self.image_name)
 
     def pull_tag(self, tag):
         """Pull an image tag.
