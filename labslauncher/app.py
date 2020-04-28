@@ -1,4 +1,5 @@
 """LabsLauncher Application."""
+import functools
 import os
 import sys
 import uuid
@@ -70,6 +71,7 @@ class LabsLauncherApp(App):
         # TODO: can read this from config
         self.session = uuid.uuid4()
         self.pinger = ping.Pingu(session=self.session)
+        self._heartbeat = util.Heartbeat()
         super().__init__(*args, **kwargs)
 
     def get_application_config(self):
@@ -280,6 +282,8 @@ class LabsLauncherApp(App):
             if cont.status == "running":
                 cont.kill()
             cont.remove()
+        # no harm stopping regardless of conditionals above
+        self._heartbeat.stop()
         self.set_status()
 
     @staticmethod
@@ -345,6 +349,10 @@ class LabsLauncherApp(App):
         if not self.disable_pings:
             self.pinger.send_container_ping(
                 'start', self.container, self.image_name)
+            callback = functools.partial(
+                self.pinger.send_container_ping,
+                'update', self.container, self.image_name)
+            self._heartbeat.start(callback)
 
     def pull_tag(self, tag):
         """Pull an image tag.
