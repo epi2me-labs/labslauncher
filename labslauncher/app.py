@@ -1,8 +1,10 @@
 """LabsLauncher Application."""
 import os
 import sys
+import uuid
 
 import docker
+from epi2melabs import ping
 from kivy.config import Config
 Config.set('graphics', 'resizable', False)
 Config.set('graphics', 'width', 400)
@@ -47,7 +49,7 @@ def main():
     app = LabsLauncherApp()
     if '--latest' in sys.argv:
         # money patch to run 'latest' container
-        app.current_image_tag('latest')
+        app.current_image_tag = 'latest'
         app.safe_fetch_local_image()
     if '--no-pings' in sys.argv:
         app.disable_pings = True
@@ -65,6 +67,9 @@ class LabsLauncherApp(App):
         """Initialize the application."""
         self.defaults = labslauncher.Settings()
         self.disable_pings = False
+        # TODO: can read this from config
+        self.session = uuid.uuid4()
+        self.pinger = ping.Pingu(session=self.session)
         super().__init__(*args, **kwargs)
 
     def get_application_config(self):
@@ -78,12 +83,14 @@ class LabsLauncherApp(App):
         self.icon = resource_filename('labslauncher', 'epi2me.ico')
         self.title = "EPI2ME-Labs Launcher"
 
-        self.__current_image_tag = None
-        self.__image = None
-        if self.docker_is_running:
-            r = self.fetch_latest_remote_tag()
-            self.__current_image_tag = r if r else self.dockerhub_image_tags[0]
-        self.safe_fetch_local_image()
+        if not hasattr(self, '_current_image_tag'):
+            self._current_image_tag = None
+            self.__image = None
+            if self.docker_is_running:
+                r = self.fetch_latest_remote_tag()
+                self._current_image_tag = r if r else self.dockerhub_image_tags[0]
+            self.safe_fetch_local_image()
+        Logger.info("Image tag: {}".format(self.current_image_tag))
 
         self.sm = ScreenManager()
         self.sm.add_widget(screens.HomeScreen(name='home'))
@@ -171,14 +178,14 @@ class LabsLauncherApp(App):
     @property
     def current_image_tag(self):
         """Get the current image tag."""
-        if self.__current_image_tag is None and self.docker_is_running:
-            self.__current_image_tag = self.fetch_latest_remote_tag()
-        return self.__current_image_tag
+        if self._current_image_tag is None and self.docker_is_running:
+            self._current_image_tag = self.fetch_latest_remote_tag()
+        return self._current_image_tag
 
     @current_image_tag.setter
     def current_image_tag(self, tag):
         """Change the current image tag."""
-        self.__current_image_tag = tag
+        self._current_image_tag = tag
 
     def fetch_local_image(self):
         """Get the docker image."""
@@ -266,7 +273,7 @@ class LabsLauncherApp(App):
         cont = self.container
         if cont is not None:
             if not self.disable_pings:
-                util.send_container_ping('stop', cont, self.image_name)
+                self.pinger.send_container_ping('stop', cont, self.image_name)
             if cont.status == "running":
                 cont.kill()
             cont.remove()
@@ -333,7 +340,7 @@ class LabsLauncherApp(App):
             pass
         self.set_status()
         if not self.disable_pings:
-            util.send_container_ping('start', self.container, self.image_name)
+            self.pinger.send_container_ping('start', self.container, self.image_name)
 
     def pull_tag(self, tag):
         """Pull an image tag.
