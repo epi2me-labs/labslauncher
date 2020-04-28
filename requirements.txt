@@ -1,4 +1,5 @@
 Cython==0.29.15
+epi2melabs==0.0.1
 docker==4.2.0
 Kivy==1.11.1
 Kivy-Garden==0.1.4
