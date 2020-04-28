@@ -88,7 +88,10 @@ class LabsLauncherApp(App):
             self.__image = None
             if self.docker_is_running:
                 r = self.fetch_latest_remote_tag()
-                self._current_image_tag = r if r else self.dockerhub_image_tags[0]
+                if r:
+                    self._current_image_tag = r
+                else:
+                    self.dockerhub_image_tags[0]
             self.safe_fetch_local_image()
         Logger.info("Image tag: {}".format(self.current_image_tag))
 
@@ -340,7 +343,8 @@ class LabsLauncherApp(App):
             pass
         self.set_status()
         if not self.disable_pings:
-            self.pinger.send_container_ping('start', self.container, self.image_name)
+            self.pinger.send_container_ping(
+                'start', self.container, self.image_name)
 
     def pull_tag(self, tag):
         """Pull an image tag.
