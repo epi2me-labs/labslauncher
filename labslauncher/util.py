@@ -2,6 +2,8 @@
 
 import functools
 import json
+import threading
+import time
 
 import docker
 import requests
@@ -108,3 +110,46 @@ def pull_with_progress(image, tag):
                 layers[resp['id']] = resp["progressDetail"]["current"]
                 current = sum(layers.values())
                 yield current, total
+
+
+class Heartbeat():
+    """Run a function on an interval."""
+
+    def __init__(self):
+        """Initialize the class."""
+        self._running = threading.Event()
+
+    def __del__(self):
+        """Stop the thread if running."""
+        self.stop()
+
+    def start(self, callback, interval=1200):
+        """Start running a function.
+
+        :param callback: the function to run.
+        :param interval: interval inseconds between calls.
+
+        The first call to the function will be after the first interval has
+        elapsed.
+        """
+        self.stop()
+        self._running.set()
+        self._thread = threading.Thread(
+            target=self._runner, args=(callback, interval))
+        self._thread.daemon = True
+        self._thread.start()
+
+    def stop(self):
+        """Stop running the function."""
+        if self._running.is_set():
+            self._running.clear()
+            self._thread.join()
+
+    def _runner(self, callback, interval):
+        t0 = time.time()
+        while self._running.is_set():
+            time.sleep(1)
+            now = time.time()
+            if t0 + interval < now:
+                callback()
+                t0 = now
