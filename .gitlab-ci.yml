@@ -53,6 +53,11 @@ bionic-deb:
         - export MAJOR=${PARTS[0]:1}
         - export MINOR=${PARTS[1]}
         - export SUB=${PARTS[2]}
+        - export DEBVER="$MAJOR.$MINOR.$SUB"
+        # check the version in the python package matches the tag
+        - PYVER=$(grep "__version__ = " labslauncher/__init__.py | awk '{gsub("\"","",$3); print $3}')
+        - echo "DEBVER='$DEBVER'   PYVER='$PYVER'"
+        - if [[ "$PYVER" != "$DEBVER" ]]; then echo "Mismatching TAG and PACKAGE versions"; exit 1; else echo "TAG and PACKAGE versions agree."; fi
         - echo -e "\e[1m\e[34mTagging with '\e[35m$MAJOR.$MINOR.$SUB\e[34m'\e[0m"
     only:
         - /^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$/
