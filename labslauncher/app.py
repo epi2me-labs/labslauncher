@@ -94,7 +94,7 @@ class LabsLauncherApp(App):
                 if r:  # we have the latest
                     self._current_image_tag = r
                 else:
-                    self.dockerhub_image_tags[0]
+                    self._current_image_tag = self.dockerhub_image_tags[0]
             self.safe_fetch_local_image()
         Logger.info("Image tag: {}".format(self.current_image_tag))
 
