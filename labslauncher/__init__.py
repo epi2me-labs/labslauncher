@@ -1,7 +1,7 @@
 """Application for managing a notebook server."""
 import json
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"
 
 
 class Settings(list):

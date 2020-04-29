@@ -40,6 +40,15 @@
         valign: 'top'
         text: "The network port to used to communicate between web-browser and notebook server."
 
+<UpdatePopup@Popup>:
+    auto_dismiss: True
+    title: "Update available: {}".format(app.dockerhub_image_tags[0])
+    size_hint: 0.8, 0.6
+    Label:
+        text_size: self.size
+        valign: 'top'
+        text: "An update to the notebook server is available. Updating the notebook server will allowed continued use to the most recent EPI2ME Labs notebooks on GitHub. Please press the Update button on the main screen to update.\n\nCurrent version: {}.\nLatest version: {}.".format(app.current_image_tag, app.dockerhub_image_tags[0])
+
 <OurButton@Button>:
     size: 100, 40
     size_hint: None, None
@@ -56,6 +65,7 @@
     startbtn: startbtn
     stopbtn: stopbtn
     addrbtn: addrbtn
+    versionlbl: versionlbl
     BoxLayout:
         orientation: "vertical"
         AnchorLayout:
@@ -105,6 +115,13 @@
                 text: "Navigate to the [color=2a7cdf][ref=click]Welcome page[/ref][/color] to get started."
                 markup: True
                 on_ref_press: root.open_colab()
+        ButtonRow:
+            Label:
+                id: versionlbl
+                text_size: self.size
+                font_size: 12
+                halign: 'right'
+                text: "Launcher Version: {}    Server Version: {}".format(app.version, app.current_image_tag)
 
 <StartScreen>:
     id: start_screen
@@ -115,6 +132,7 @@
     startbtn: startbtn
     updatebtn: updatebtn
     backbtn: backbtn
+    on_enter: if app.can_update: Factory.UpdatePopup().open()
     BoxLayout:
         orientation: "vertical"
         ButtonRow:

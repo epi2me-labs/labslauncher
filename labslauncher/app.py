@@ -66,6 +66,7 @@ class LabsLauncherApp(App):
 
     def __init__(self, *args, **kwargs):
         """Initialize the application."""
+        self.version = labslauncher.__version__
         self.defaults = labslauncher.Settings()
         self.disable_pings = False
         # TODO: can read this from config
@@ -90,7 +91,7 @@ class LabsLauncherApp(App):
             self.__image = None
             if self.docker_is_running:
                 r = self.fetch_latest_remote_tag()
-                if r:
+                if r:  # we have the latest
                     self._current_image_tag = r
                 else:
                     self.dockerhub_image_tags[0]
@@ -175,10 +176,11 @@ class LabsLauncherApp(App):
             self.get_config("container"), self.current_image_tag)
 
     def fetch_latest_remote_tag(self):
-        """Scrape the latest remote tag for the chosen image from dockerhub."""
-        return util.newest_tag(self.get_config("container"),
-                               tags=self.dockerhub_image_tags,
-                               client=self.docker)
+        """Scrape the latest remote tag available locally."""
+        return util.newest_tag(
+            self.get_config("container"),
+            tags=self.dockerhub_image_tags,
+            client=self.docker)
 
     @property
     def current_image_tag(self):
@@ -240,6 +242,12 @@ class LabsLauncherApp(App):
         self.image = None
         self.current_image_tag = self.dockerhub_image_tags[0]
         self.ensure_image()
+        # if things succeeded this shouldn't do anything, else it will reset
+        self.current_image_tag = self.fetch_latest_remote_tag()
+        # TODO: this is a bit of a hack, should setup a Property and bind
+        self.sm.get_screen('home').ids.versionlbl.text = \
+            "Launcher Version: {}    Server Version: {}".format(
+                self.version, self.current_image_tag)
 
     @property
     def container(self):
