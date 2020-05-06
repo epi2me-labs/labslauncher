@@ -1,11 +1,8 @@
-Cython==0.29.15
-epi2melabs==0.0.2
 docker==4.2.0
-Kivy==1.11.1
-Kivy-Garden==0.1.4
-Pillow==7.0.0
+password_strength==0.0.3.post2
 PyInstaller==3.6
-pyperclip==1.7.0
+pyqt5==5.14.2
+pyqt5-sip==12.7.2
 requests==2.20.0
 semver==2.9.1
 setuptools < 45
