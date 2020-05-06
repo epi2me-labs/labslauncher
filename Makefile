@@ -16,12 +16,14 @@ ifeq ($(shell uname), Darwin)
 endif
 
 PYTHON ?= python
-
 IN_VENV=. ./venv/bin/activate
+
+PYQT5SIP = $(shell grep pyqt5-sip requirements.txt)
 
 venv/bin/activate:
 	test -d venv || virtualenv venv --python=$(PYTHON) --prompt "(build) "
 	${IN_VENV} && pip install pip --upgrade
+	${IN_VENV} && pip install ${PYQT5SIP}
 	${IN_VENV} && pip install -r requirements.txt
 
 testenv: venv/bin/activate
@@ -30,7 +32,7 @@ test: venv/bin/activate
 	${IN_VENV} && pip install flake8 flake8-rst-docstrings flake8-docstrings flake8-import-order
 	${IN_VENV} && flake8 labslauncher \
 		--import-order-style google --application-import-names labslauncher \
-		--statistics --per-file-ignores='labslauncher/app.py:E402'
+		--statistics
 
 dist/EPI2ME-Labs-Launcher: venv/bin/activate
 	${IN_VENV} && python setup.py develop
@@ -56,7 +58,7 @@ deb: clean dist/EPI2ME-Labs-Launcher
 	mkdir -p deb-src/usr/share/applications
 	cp dist/EPI2ME-Labs-Launcher deb-src/usr/local/bin/
 	cp labslauncher.desktop deb-src/usr/share/applications
-	cp labslauncher/EPI2ME.png deb-src/usr/share/applications
+	cp EPI2ME.png deb-src/usr/share/applications/EPI2ME.png
 	cp -rp deb-src/ tmp/
 	$(SEDI) "s/PROJECT/$(PROJECT)/g"   tmp/DEBIAN/control
 	$(SEDI) "s/MAJOR/$(MAJOR)/g"       tmp/DEBIAN/control

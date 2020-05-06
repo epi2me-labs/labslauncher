@@ -37,10 +37,10 @@ def Entrypoint(dist, group, name, **kwargs):
 block_cipher = None
 a = Entrypoint(
     'labslauncher', 'console_scripts', 'labslauncher',
-    hiddenimports=['cython'],
+    hiddenimports=[],
     datas=[
         ('labslauncher/{}'.format(x), 'labslauncher')
-        for x in ['labslauncher.kv', 'epi2me.ico', 'fontawesome-webfont.ttf', 'fontawesome.fontd', 'EPI2ME_labs_logo_RGB_negative_large.png']]
+        for x in ['epi2me.png', 'epi2me_labs_logo.png']]
 ) 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(

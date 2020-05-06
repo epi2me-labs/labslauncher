@@ -59,7 +59,8 @@ setup(
     packages=find_packages(exclude=['*.test', '*.test.*', 'test.*', 'test']),
     # NOTE: these need to be added to the pyinstaller spec file also
     package_data={'labslauncher':[
-        'labslauncher.kv', 'epi2me.ico', 'fontawesome-webfont.ttf', 'fontawesome.fontd', 'EPI2ME_labs_logo_RGB_negative_large.png']},
+        os.path.join('labslauncher', x) for x in (
+            'epi2me.png', 'EPI2ME_labs_logo_RGB_negative_large.png')]},
     zip_safe=False,
     test_suite=None,
     data_files=data_files,
