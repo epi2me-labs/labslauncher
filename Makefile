@@ -34,6 +34,7 @@ test: venv/bin/activate
 		--import-order-style google --application-import-names labslauncher \
 		--statistics
 
+
 dist/EPI2ME-Labs-Launcher: venv/bin/activate
 	${IN_VENV} && python setup.py develop
 	${IN_VENV} && pyinstaller EPI2ME-Labs-Launcher.spec
