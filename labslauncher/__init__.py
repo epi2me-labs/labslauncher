@@ -1,6 +1,9 @@
 """Application for managing a notebook server."""
 import os
 
+from PyQt5 import sip  # noqa: F401
+
+
 __version__ = "0.4.0"
 
 

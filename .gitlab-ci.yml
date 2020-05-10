@@ -20,9 +20,7 @@ test:
     script:
         - export DEBIAN_FRONTEND=noninteractive
         - apt-get update -qq && apt-get install -y -qq
-          build-essential wget fakeroot rsync ssh python-virtualenv python3-dev xorg xvfb
-        - export DISPLAY=:99.0
-        - /sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -screen 0 1280x720x24 -ac +extension GLX
+          build-essential wget fakeroot rsync ssh python-virtualenv python3-dev xvfb libx11-xcb1 libxext6 libxrender1 libsm6 libice6 libglib2.0-0
         - PYTHON=python3 make deb
         - dpkg -I ont-epi2melabs-launcher*.deb
     artifacts:
