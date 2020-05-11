@@ -116,7 +116,6 @@ def pull_with_progress(image, tag):
 class DockerClient():
     """Handle interaction with docker."""
 
-    download = qtext.FloatProperty(0.0)
     status = qtext.Property(('', 'unknown'))
     tag = qtext.StringProperty('')
     _available = qtext.BoolProperty(False)
@@ -231,7 +230,7 @@ class DockerClient():
                 image = self.pull_image(tag)
         return image
 
-    def pull_image(self, tag=None):
+    def pull_image(self, tag=None, progress=None, stopped=None):
         """Pull an image tag whilst updating download progress.
 
         :param tag: tag to fetch. If None the latest tag is pulled.
@@ -244,12 +243,14 @@ class DockerClient():
         full_name = self.full_image_name(tag=tag)
 
         # to get feedback we need to use the low-level API
-        self.download.value = 0.0
         self.total_size = None
         for current, total in pull_with_progress(self.image_name, tag):
-            self.download.value = 100 * current / total
+            if stopped is not None and stopped.is_set():
+                return None
+            if progress is not None:
+                progress.emit(100 * current / total)
             self.total_size = total
-        self.download.value = 100.0
+        progress.emit(100.0)
         image = self.docker.images.get(full_name)
         self.tag.value = self.latest_available_tag
         return image

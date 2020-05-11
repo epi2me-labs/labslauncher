@@ -9,17 +9,17 @@ from password_strength import PasswordPolicy
 from pkg_resources import resource_filename
 from PyQt5.QtCore import (
     PYQT_VERSION_STR, pyqtSignal as Signal, pyqtSlot as Slot,
-    Qt, QT_VERSION_STR, QTimer)
+    Qt, QT_VERSION_STR, QThreadPool, QTimer)
 from PyQt5.QtGui import QIcon, QIntValidator, QPixmap
 from PyQt5.QtWidgets import (
     QAction, QApplication, QDesktopWidget, QDialog, QFileDialog, QGridLayout,
-    QHBoxLayout, QLabel, QLineEdit, QMenuBar, QMessageBox, QProgressBar,
-    QPushButton, QStackedWidget, QVBoxLayout, QWidget)
+    QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
+    QProgressBar, QPushButton, QStackedWidget, QVBoxLayout, QWidget)
 
 import labslauncher
 from labslauncher import util
 from labslauncher.dockerutil import DockerClient
-from labslauncher.qtext import ClickLabel, RunAsync, Settings
+from labslauncher.qtext import ClickLabel, Settings, Worker
 
 
 class Screen(QWidget):
@@ -183,8 +183,6 @@ class StartScreen(Screen):
         super().__init__(parent=parent)
         self.token_policy = PasswordPolicy.from_names(
             length=8, uppercase=1, numbers=1)
-        self.thread = None
-
         self.layout = QVBoxLayout()
 
         # header
@@ -237,7 +235,6 @@ class StartScreen(Screen):
 
         self.setLayout(self.layout)
 
-        self.app.docker.download.changed.connect(self.on_download)
         self.app.docker.status.changed.connect(self.on_status)
         self.on_status(self.app.docker.status.value)
 
@@ -304,28 +301,28 @@ class StartScreen(Screen):
 
         :param callback: function to run when pull as completed.
         """
-        self.thread = RunAsync(self.app.docker.pull_image)
-        # in case someone close the app
-        self.thread.setTerminationEnabled(True)
-        self.app.finished.connect(self._terminate_thread)
+        self.worker = Worker(self.app.docker.pull_image)
+        self.worker.setAutoDelete(True)
+        self.app.closing.connect(self.worker.stop)
+
         # disable buttons during pull, re-enable when done
         for btn in (self.start_btn, self.update_btn, self.back_btn):
-            # TODO: update shouldn't be universally enabled
             btn.setEnabled(False)
-            self.thread.finished.connect(
-                lambda: btn.setEnabled(True))
+            self.worker.signals.finished.connect(
+                lambda: btn.setEnabled(True)
+                if btn is not self.update_btn
+                else btn.setEnable(self.app.docker.update_available))
         self.repaint()
-        self.thread.finished.connect(self.repaint)
+        self.worker.signals.finished.connect(self.repaint)
         if callback is not None:
-            self.thread.finished.connect(callback)
-        self.progress_dlg = DownloadDialog(self)
-        self.thread.finished.connect(self.progress_dlg.close)
-        self.thread.start()
-        self.progress_dlg.show()
+            self.worker.signals.finished.connect(callback)
+        self.progress_dlg = DownloadDialog(
+            progress=self.worker.signals.progress, parent=self)
+        self.progress_dlg.finished.connect(self.worker.stop)
+        self.worker.signals.finished.connect(self.progress_dlg.close)
 
-    def _terminate_thread(self):
-        if self.thread is not None and self.thread.isRunning():
-            self.thread.terminate
+        self.app.pool.start(self.worker)
+        self.progress_dlg.show()
 
     @Slot(float)
     def on_download(self, value):
@@ -359,7 +356,7 @@ class StartScreen(Screen):
 class DownloadDialog(QDialog):
     """About dialog."""
 
-    def __init__(self, parent=None):
+    def __init__(self, progress, parent=None):
         """Initialize the dialog."""
         super().__init__(parent)
         self.setWindowTitle("Downloading server.")
@@ -369,16 +366,15 @@ class DownloadDialog(QDialog):
         self.pbar = QProgressBar(self)
         self.layout.addWidget(self.pbar)
         self.setLayout(self.layout)
-        self.parent().app.docker.download.changed.connect(self.on_download)
+        progress.connect(self.on_progress)
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
         self.setWindowFlags(self.windowFlags() | Qt.Tool)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
         self.setAttribute(Qt.WA_MacAlwaysShowToolWindow)
-
         self.resize(300, 50)
 
     @Slot(float)
-    def on_download(self, value):
+    def on_progress(self, value):
         """Update progress bar.
 
         :param value: download progress.
@@ -418,7 +414,7 @@ class UpdateScreen(Screen):
 
         self.l0 = QHBoxLayout()
         self.layout.insertStretch(-1)
-        self.dismiss_btn = QPushButton("Dismiss")
+        self.dismiss_btn = QPushButton("OK")
         self.dismiss_btn.clicked.connect(self.goto_start.emit)
         self.l0.addWidget(self.dismiss_btn)
         self.layout.addLayout(self.l0)
@@ -426,12 +422,14 @@ class UpdateScreen(Screen):
         self.setLayout(self.layout)
 
 
-class LabsLauncher(QDialog):
+class LabsLauncher(QMainWindow):
     """Main application window."""
 
-    def __init__(self, parent=None):
+    closing = Signal(bool)
+
+    def __init__(self, app):
         """Initialize the main window."""
-        super().__init__(parent)
+        super().__init__()
         self.version = labslauncher.__version__
         self.about = About(self.version)
 
@@ -445,7 +443,10 @@ class LabsLauncher(QDialog):
 
         self.settings = Settings(labslauncher.Defaults())
         self.settings.override()
-        self.finished.connect(self.settings.qsettings.sync)
+        app.aboutToQuit.connect(self.settings.qsettings.sync)
+
+        self.pool = QThreadPool()
+        app.aboutToQuit.connect(self.pool.waitForDone)
 
         fixed_tag = self.settings["fixed_tag"]
         if fixed_tag == "":
@@ -462,19 +463,18 @@ class LabsLauncher(QDialog):
         self.on_status(self.docker.status.value, boot=True)
 
         self.layout = QVBoxLayout()
-        self.menu_bar = QMenuBar()
-        self.file_menu = self.menu_bar.addMenu("&File")
+
+        self.file_menu = self.menuBar().addMenu("&File")
         self.exit_act = QAction("Exit", self)
         self.exit_act.triggered.connect(self.close)
         self.file_menu.addAction(self.exit_act)
-        self.help_menu = self.menu_bar.addMenu("&Help")
+        self.help_menu = self.menuBar().addMenu("&Help")
         self.about_act = QAction('About', self)
         self.about_act.triggered.connect(self.about.show)
         self.help_menu.addAction(self.about_act)
         self.help_act = QAction("Help", self)
         self.help_act.triggered.connect(self.show_help)
         self.help_menu.addAction(self.help_act)
-        self.layout.addWidget(self.menu_bar)
 
         self.stack = QStackedWidget()
         self.home = HomeScreen(parent=self)
@@ -484,13 +484,21 @@ class LabsLauncher(QDialog):
         self.stack.addWidget(self.start)
         self.stack.addWidget(self.update)
         self.layout.addWidget(self.stack)
-        self.setLayout(self.layout)
+
+        w = QWidget()
+        w.setLayout(self.layout)
+        self.setCentralWidget(w)
 
         self.home.goto_start.connect(self.show_start)
         self.start.goto_home.connect(self.show_home)
         self.update.goto_start.connect(
             functools.partial(self.stack.setCurrentIndex, 1))
         self.show_home()
+
+    def closeEvent(self, event):
+        """Emit closing signal on window close."""
+        self.closing.emit(True)
+        super().closeEvent(event)
 
     def show_help(self):
         """Open webbrowser with application help."""
@@ -550,7 +558,7 @@ class LabsLauncher(QDialog):
     def moveEvent(self, event):
         """Move the progress dialog when main window moves."""
         super().moveEvent(event)
-        if hasattr(self.start, 'progress_dlg'):
+        if hasattr(self, 'start') and hasattr(self.start, 'progress_dlg'):
             diff = event.pos() - event.oldPos()
             geo = self.start.progress_dlg.geometry()
             geo.moveTopLeft(geo.topLeft() + diff)
@@ -600,6 +608,6 @@ def main():
     app_icon = QIcon()
     app_icon.addFile(resource_filename('labslauncher', 'epi2me.png'))
     app.setWindowIcon(app_icon)
-    launcher = LabsLauncher()
+    launcher = LabsLauncher(app)
     launcher.show()
     sys.exit(app.exec_())
