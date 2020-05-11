@@ -1,8 +1,8 @@
 [Desktop Entry]
 Version=1.0
 Name=EPI2ME-Labs Server Control
-Comment=Start, stop, and upgrade the Epi2Me Labs server
+Comment=Start, stop, and upgrade the EPI2ME Labs server
 Exec=/usr/local/bin/EPI2ME-Labs-Launcher
-Icon=/usr/share/applications/EPI2ME.png
+Icon=/usr/share/applications/epi2me.png
 Type=Application
 Categories=Utility;Application

@@ -40,7 +40,7 @@ a = Entrypoint(
     hiddenimports=[],
     datas=[
         ('labslauncher/{}'.format(x), 'labslauncher')
-        for x in ['epi2me.png', 'epi2me_labs_logo.png']]
+        for x in ['epi2me.png', 'epi2me.ico', 'epi2me_labs_logo.png']]
 ) 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
@@ -52,4 +52,5 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True)
+    console=False,
+    icon=os.path.join('labslauncher', 'epi2me.ico'))
