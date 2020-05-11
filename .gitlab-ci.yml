@@ -7,6 +7,8 @@ stages:
 test:
     image: ${IMAGE}:16.04
     stage: test
+    tags:
+        - linux
     before_script:
         - export DEBIAN_FRONTEND=noninteractive
         - apt-get update -qq && apt-get install -y -qq
@@ -14,9 +16,21 @@ test:
     script:
         - PYTHON=python3 make test
 
+build-win:
+    stage: build
+    tags:
+        - epi2melabs-win
+    script:
+        - .\winbuild.ps1
+    artifacts:
+        paths:
+            - "dist/*"
+
 .build: &build
     image: ${IMAGEUSED}
     stage: build
+    tags:
+        - linux
     script:
         - export DEBIAN_FRONTEND=noninteractive
         - apt-get update -qq && apt-get install -y -qq
