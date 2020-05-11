@@ -1,8 +1,11 @@
 """Extras for Qt."""
 import argparse
+import sys
+import threading
+import traceback
 
 from PyQt5.QtCore import (
-    pyqtSignal as Signal, QObject, QSettings, Qt, QThread)
+    pyqtSignal as Signal, pyqtSlot as Slot, QObject, QRunnable, QSettings, Qt)
 from PyQt5.QtGui import QCursor
 from PyQt5.QtWidgets import QLabel
 
@@ -56,17 +59,63 @@ class FloatProperty(Property):
     changed = Signal(float)
 
 
-class RunAsync(QThread):
-    """Run a function in a QThread."""
+class WorkerSignals(QObject):
+    """Defines the signals available from a running worker thread.
 
-    def __init__(self, function):
-        """Initialize the QThread."""
-        super().__init__()
-        self.function = function
+    finished - no data
+    error - tuple (exctype, value, traceback.format_exc() )
+    result - object data returned from processing, anything
+    progress - int indicating % progress
+    """
 
+    finished = Signal()
+    error = Signal(tuple)
+    result = Signal(object)
+    progress = Signal(float)
+
+
+class Worker(QRunnable):
+    """A worker thread."""
+
+    def __init__(self, fn, *args, **kwargs):
+        """Initialize the worker.
+
+        :param callback: function callback to run on this worker thread.
+        :param args: arguments to pass to the callback function.
+        :param kwargs: keyword arguments to pass to the callback function.
+
+        To enable progress indicator the worker should accept a Qt Signal
+        as a `progress` keyword argument. To enable stopping of the thread
+        the function should accept a threading.Event as a `stopped` keyword
+        argument.
+        """
+        super(Worker, self).__init__()
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+        self.signals = WorkerSignals()
+        self.kwargs['progress'] = self.signals.progress
+        self.stopped = threading.Event()
+        self.kwargs['stopped'] = self.stopped
+
+    @Slot()
     def run(self):
-        """Run the callback."""
-        self.function()
+        """Run the function."""
+        try:
+            result = self.fn(*self.args, **self.kwargs)
+        except Exception:
+            traceback.print_exc()
+            exctype, value = sys.exc_info()[:2]
+            self.signals.error.emit((exctype, value, traceback.format_exc()))
+        else:
+            self.signals.result.emit(result)
+        finally:
+            self.signals.finished.emit()
+
+    def stop(self):
+        """Signal the worker function to stop."""
+        print("closing, setting stop")
+        self.stopped.set()
 
 
 class ClickLabel(QLabel):
