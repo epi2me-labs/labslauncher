@@ -4,23 +4,26 @@ MAJOR    ?= 0
 MINOR    ?= 0
 SUB      ?= 0
 PATCH    ?= 0
-VERSION   ="$(MAJOR).$(MINOR).$(SUB)"
+VERSION   = "$(MAJOR).$(MINOR).$(SUB)"
 CODENAME ?= $(shell awk -F= '/CODENAME/{print $$2}' /etc/lsb-release)
-DEB	  ="$(PROJECT)-$(MAJOR).$(MINOR).$(SUB)-$(PATCH)~$(CODENAME).deb"
+DEB	      = "$(PROJECT)-$(MAJOR).$(MINOR).$(SUB)-$(PATCH)~$(CODENAME).deb"
 MD5SUM    = md5sum
 SEDI      = sed -i
-PYTHON ?= python
-VENV=venv/bin/activate
-PYQT5SIP = $(shell grep pyqt5-sip requirements.txt)
+PYTHON   ?= python
+VENV      = venv/bin/activate
+
+PYQT5SIP  = $(shell grep pyqt5-sip requirements.txt)
 PYWINTYPES=
+PYINSTALLERARGS=--onefile
 
 ifeq ($(shell uname), Darwin)
-        MD5SUM = md5 -r
-        SEDI   = sed -i ""
+    MD5SUM = md5 -r
+    SEDI   = sed -i ""
+    PYINSTALLERARGS = ""
 endif
 ifneq (,$(findstring MINGW64,$(shell uname)))
-        VENV=venv/Scripts/activate
-	PYWINTYPES=pypiwin32
+    VENV=venv/Scripts/activate
+    PYWINTYPES=pypiwin32
 endif
 IN_VENV=. ./$(VENV)
 
@@ -43,7 +46,7 @@ test: $(VENV)
 
 dist/EPI2ME-Labs-Launcher: $(VENV)
 	${IN_VENV} && python setup.py develop
-	${IN_VENV} && pyinstaller EPI2ME-Labs-Launcher.spec
+	${IN_VENV} && pyinstaller EPI2ME-Labs-Launcher.spec ${PYINSTALLERARGS}
 
 
 .PHONY: run
