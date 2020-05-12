@@ -7,4 +7,4 @@ pip install pip --upgrade
 pip install pyqt5-sip==12.7.2
 pip install -r requirements.txt
 python setup.py develop
-pyinstaller EPI2ME-Labs-Launcher.spec
+pyinstaller EPI2ME-Labs-Launcher.spec --onefile
