@@ -73,6 +73,10 @@ class Defaults(list):
             "Network port for communication between host and notebook server.",
             "port", 8888)
         self.append(
+            "Auxiliary Port",
+            "Auxiliary network port for additional applications.",
+            "aux_port", 8889)
+        self.append(
             "Security Token",
             "Security token for notebook server.",
             "token", "EPI2MELabs")
