@@ -266,7 +266,7 @@ class DockerClient():
             pass
         return None
 
-    def start_container(self, mount, token, port):
+    def start_container(self, mount, token, port, aux_port):
         """Start the server container, removing a previous one if necessary.
 
         .. note:: The behaviour of docker.run is that a pull will be invoked if
@@ -280,9 +280,11 @@ class DockerClient():
 
         try:
             # note: colab requires the port in the container to be equal
-            ports = {int(port): int(port)}
+            ports = {int(port): int(port), int(aux_port): int(aux_port)}
             if self.host_only:
-                ports = {int(port): ('127.0.0.1', int(port))}
+                ports = {
+                    int(port): ('127.0.0.1', int(port)),
+                    int(aux_port): ('127.0.0.1', int(aux_port))}
             self.docker.containers.run(
                 self.full_image_name(),
                 CMD,

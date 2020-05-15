@@ -177,12 +177,16 @@ class StartScreen(Screen):
     port_help = (
         "The network port to used to communicate between web-browser\n"
         "and notebook server.")
+    aux_port_help = (
+        "An auxialiary network port used for secondary applications\n"
+        "e.g. for use by the Pavian metagenomics dataset explorer.")
 
     def __init__(self, parent=None):
         """Initialize the screen."""
         super().__init__(parent=parent)
         self.token_policy = PasswordPolicy.from_names(
             length=8, uppercase=1, numbers=1)
+        self.onlyInt = QIntValidator()
         self.layout = QVBoxLayout()
 
         # header
@@ -207,13 +211,19 @@ class StartScreen(Screen):
         self.token_txt.setToolTip(self.token_help)
         self.port_lbl = QLabel('Port:')
         self.port_txt = QLineEdit(text=str(self.app.settings['port']))
-        self.onlyInt = QIntValidator()
         self.port_txt.setValidator(self.onlyInt)
         self.port_txt.setToolTip(self.port_help)
+        self.aux_port_lbl = QLabel('Aux. Port:')
+        self.aux_port_txt = QLineEdit(text=str(self.app.settings['aux_port']))
+        self.aux_port_txt.setValidator(self.onlyInt)
+        self.aux_port_txt.setToolTip(self.aux_port_help)
+
         self.l1.addWidget(self.token_lbl, 1, 0)
         self.l1.addWidget(self.token_txt, 1, 1)
         self.l1.addWidget(self.port_lbl, 2, 0)
         self.l1.addWidget(self.port_txt, 2, 1)
+        self.l1.addWidget(self.aux_port_lbl, 3, 0)
+        self.l1.addWidget(self.aux_port_txt, 3, 1)
         self.layout.addLayout(self.l1)
 
         # spacer
@@ -253,12 +263,15 @@ class StartScreen(Screen):
         mount = self.path_txt.text()
         token = self.token_txt.text()
         port = self.port_txt.text()
+        aux_port = self.aux_port_txt.text()
         # validate inputs
         valid = all([
             mount != "",
             os.path.isdir(mount),
             len(self.token_policy.test(token)) == 0,
-            self.port_txt.hasAcceptableInput() and int(port) > 1024])
+            self.port_txt.hasAcceptableInput() and int(port) > 1024,
+            self.aux_port_txt.hasAcceptableInput() and int(aux_port) > 1024,
+            port != aux_port])
 
         if valid:
             if self.app.docker.latest_available_tag is None:
@@ -275,7 +288,8 @@ class StartScreen(Screen):
                 "1. A valid folder must be given.\n"
                 "2. The token must be 8 characters and include uppercase, "
                 "lowercase and numbers.\n"
-                "3. The port must be >1024.")
+                "3. The ports must be >1024.\n"
+                "4. Port and Aux. port must be distinct.")
             msg.exec_()
 
     def _start_container(self):
@@ -283,9 +297,10 @@ class StartScreen(Screen):
         mount = self.path_txt.text()
         token = self.token_txt.text()
         port = self.port_txt.text()
+        aux_port = self.aux_port_txt.text()
         for btn in (self.start_btn, self.update_btn):
             btn.setEnabled(False)
-        self.app.docker.start_container(mount, token, port)
+        self.app.docker.start_container(mount, token, port, aux_port)
         self.repaint()
         if self.app.docker.status.value[1] != "running":
             msg = QMessageBox(self)
