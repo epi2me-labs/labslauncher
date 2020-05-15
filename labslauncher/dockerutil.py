@@ -246,6 +246,7 @@ class DockerClient():
         self.total_size = None
         for current, total in pull_with_progress(self.image_name, tag):
             if stopped is not None and stopped.is_set():
+                print("quitting")
                 return None
             if progress is not None:
                 progress.emit(100 * current / total)
