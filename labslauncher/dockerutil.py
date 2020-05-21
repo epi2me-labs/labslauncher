@@ -3,12 +3,32 @@
 import functools
 import json
 
+from cachetools import cached, TTLCache
 import docker
 from PyQt5.QtCore import QTimer
 import requests
 import semver
 
 from labslauncher import qtext
+
+
+@cached(cache=TTLCache(maxsize=1, ttl=300))
+def _get_image_meta(image):
+    """Retrieve meta data from docker hub for tags of an image.
+
+    :param image: image name.
+    """
+    tags = list()
+    addr = 'https://hub.docker.com/v2/repositories/{}/tags'.format(image)
+    while True:
+        response = requests.get(addr)
+        tags_data = json.loads(response.content.decode())
+        tags.extend(tags_data['results'])
+        if tags_data['next'] is not None:
+            addr = tags_data['next']
+        else:
+            break
+    return tags
 
 
 def get_image_tags(image, prefix='v'):
@@ -19,14 +39,9 @@ def get_image_tags(image, prefix='v'):
 
     :returns: sorted list of tags, newest first, ordered by semver.
     """
-    addr = 'https://hub.docker.com/v2/repositories/{}/tags'.format(image)
-    response = requests.get(addr)
-    tags_data = json.loads(response.content.decode())
-    if any(tags_data[x] is not None for x in ['next', 'previous']):
-        raise ValueError('Tags data was paginated.')
-
+    tags_data = _get_image_meta(image)
     tags = list()
-    for t in tags_data['results']:
+    for t in tags_data:
         name = t['name']
         if name[0] != prefix:
             continue
@@ -44,6 +59,7 @@ def get_image_tags(image, prefix='v'):
     return ordered_tags
 
 
+@functools.lru_cache(5)
 def get_image_meta(image, tag):
     """Retrieve meta data from docker hub for a tag.
 
@@ -51,13 +67,8 @@ def get_image_meta(image, tag):
     :param tag: image tag.
 
     """
-    addr = 'https://hub.docker.com/v2/repositories/{}/tags'.format(image)
-    response = requests.get(addr)
-    tags_data = json.loads(response.content.decode())
-    if any(tags_data[x] is not None for x in ['next', 'previous']):
-        raise ValueError('Tags data was paginated.')
-
-    for t in tags_data['results']:
+    tags_data = _get_image_meta(image)
+    for t in tags_data:
         name = t['name']
         if name == tag:
             return t
