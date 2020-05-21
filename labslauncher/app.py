@@ -320,15 +320,10 @@ class StartScreen(Screen):
         self.worker.setAutoDelete(True)
         self.app.closing.connect(self.worker.stop)
 
-        # disable buttons during pull, re-enable when done
-        for btn in (self.start_btn, self.update_btn, self.back_btn):
-            btn.setEnabled(False)
-            self.worker.signals.finished.connect(
-                lambda: btn.setEnabled(True)
-                if btn is not self.update_btn
-                else btn.setEnable(self.app.docker.update_available))
-        self.repaint()
-        self.worker.signals.finished.connect(self.repaint)
+        self.worker.signals.finished.connect(
+            lambda: self.update_btn.setEnabled(
+                self.app.docker.update_available))
+
         if callback is not None:
             self.worker.signals.finished.connect(callback)
         self.progress_dlg = DownloadDialog(
@@ -384,8 +379,8 @@ class DownloadDialog(QDialog):
         progress.connect(self.on_progress)
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
         self.setWindowFlags(self.windowFlags() | Qt.Tool)
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
         self.setAttribute(Qt.WA_MacAlwaysShowToolWindow)
+        self.setModal(True)
         self.resize(300, 50)
 
     @Slot(float)
@@ -525,6 +520,7 @@ class LabsLauncher(QMainWindow):
 
     def show_start(self):
         """Move to the start screen."""
+        self.start.update_btn.setEnabled(self.docker.update_available)
         if self.docker.update_available:
             cur = self.docker.latest_available_tag
             new = self.docker.latest_tag

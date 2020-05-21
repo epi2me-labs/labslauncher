@@ -114,7 +114,6 @@ class Worker(QRunnable):
 
     def stop(self):
         """Signal the worker function to stop."""
-        print("closing, setting stop")
         self.stopped.set()
 
 
