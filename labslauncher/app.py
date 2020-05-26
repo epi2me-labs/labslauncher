@@ -580,7 +580,8 @@ class LabsLauncher(QMainWindow):
 
         :param state: the container state (start, update, stop).
         """
-        if not self.docker.status.value == "unknown":
+        if "unknown" in self.docker.status.value:
+            # the app just started
             return
         stats = None
         if state == 'stop':
