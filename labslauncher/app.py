@@ -1,10 +1,13 @@
 """Labslauncher main application."""
+import configparser
 import functools
 import os
+import platform
+import socket
 import sys
-import uuid
 import webbrowser
 
+from epi2melabs import ping
 from password_strength import PasswordPolicy
 from pkg_resources import resource_filename
 from PyQt5.QtCore import (
@@ -17,7 +20,6 @@ from PyQt5.QtWidgets import (
     QProgressBar, QPushButton, QStackedWidget, QVBoxLayout, QWidget)
 
 import labslauncher
-from labslauncher import util
 from labslauncher.dockerutil import DockerClient
 from labslauncher.qtext import ClickLabel, Settings, Worker
 
@@ -298,10 +300,12 @@ class StartScreen(Screen):
         token = self.token_txt.text()
         port = self.port_txt.text()
         aux_port = self.aux_port_txt.text()
+
         for btn in (self.start_btn, self.update_btn):
             btn.setEnabled(False)
         self.app.docker.start_container(mount, token, port, aux_port)
         self.repaint()
+
         if self.app.docker.status.value[1] != "running":
             msg = QMessageBox(self)
             msg.setIcon(QMessageBox.Critical)
@@ -310,6 +314,20 @@ class StartScreen(Screen):
             msg.setWindowTitle("Server Error")
             msg.setDetailedText(self.app.docker.last_failure)
             msg.exec_()
+        else:
+            config = configparser.ConfigParser()
+            config['Host'] = {
+                'hostname': socket.gethostname(),
+                'operating_system': platform.platform()}
+
+            config['Container'] = {
+                'mount': mount, 'port': port, 'aux_port': aux_port,
+                'image_tag': self.app.docker.latest_available_tag,
+                'latest_tag': self.app.docker.latest_tag,
+                'id': self.app.docker.container.id}
+            fname = os.path.join(mount, os.path.basename(ping.CONTAINER_META))
+            with open(fname, 'w') as config_file:
+                config.write(config_file)
 
     def pull_image(self, *args, callback=None):
         """Pull new image in a thread.
@@ -466,9 +484,9 @@ class LabsLauncher(QMainWindow):
             self.settings["data_bind"], self.settings["container_cmd"],
             host_only=self.settings["docker_restrict"],
             fixed_tag=fixed_tag)
+
         self.ping_timer = QTimer(self)
-        # TODO: session is unique to each app launch. best?
-        self.session = uuid.uuid4()
+        self.pinger = ping.Pingu()
         self.docker.status.changed.connect(self.on_status)
         self.on_status(self.docker.status.value, boot=True)
 
@@ -588,8 +606,8 @@ class LabsLauncher(QMainWindow):
             stats = self.docker.final_stats
         else:
             stats = self.docker.container.stats(stream=False)
-        util.send_container_ping(
-            state, stats, self.docker.image_name, self.session)
+        self.pinger.send_container_ping(
+            state, stats, self.docker.image_name)
 
 
 class About(QDialog):
