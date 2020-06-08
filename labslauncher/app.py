@@ -319,12 +319,12 @@ class StartScreen(Screen):
             config['Host'] = {
                 'hostname': socket.gethostname(),
                 'operating_system': platform.platform()}
-
             config['Container'] = {
                 'mount': mount, 'port': port, 'aux_port': aux_port,
                 'image_tag': self.app.docker.latest_available_tag,
                 'latest_tag': self.app.docker.latest_tag,
                 'id': self.app.docker.container.id}
+            config['Pings'] = {'enabled': self.settings["send_pings"]}
             fname = os.path.join(mount, os.path.basename(ping.CONTAINER_META))
             with open(fname, 'w') as config_file:
                 config.write(config_file)
