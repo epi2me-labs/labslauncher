@@ -2,6 +2,8 @@
 
 import functools
 import json
+import os
+import platform
 
 from cachetools import cached, TTLCache
 import docker
@@ -107,6 +109,11 @@ def pull_with_progress(image, tag):
     :yields: downloaded bytes, total bytes.
 
     """
+    if platform.system() == "Darwin":
+        path = "/Applications/Docker.app/Contents/Resources/bin/"
+        if path not in os.environ['PATH']:
+            os.environ['PATH'] = "{}:{}".format(path, os.environ['PATH'])
+
     image_tag = get_image_meta(image, tag)
     total = image_tag['full_size']
 

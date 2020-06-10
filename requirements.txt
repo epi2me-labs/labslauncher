@@ -1,6 +1,6 @@
 cachetools==4.1.0
 docker==4.2.0
-epi2melabs==0.0.3
+epi2melabs==0.0.4
 password_strength==0.0.3.post2
 PyInstaller==3.6
 pyqt5==5.14.2

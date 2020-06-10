@@ -58,7 +58,7 @@ exe_kwargs = {
     'debug': False,
     'bootloader_ignore_signals': False,
     'runtime_tmpdir': None,
-    'console': False,'windowed': True,
+    'console': False, 'windowed': True,
     'icon': os.path.join('labslauncher', 'epi2me.ico')}
 
 if '--onefile' in sys.argv:
@@ -76,10 +76,10 @@ else:
         exe, a.binaries, a.zipfiles, a.datas,
         **common_args)
 
-if "Darwin" in platform():
-    print(" + Building macOS bundle")
-    app = BUNDLE(
-        exe,
-        name='{}.app'.format(name),
-        icon=os.path.join('labslauncher', 'epi2me.icns'),
-        bundle_identifier=None)
+    if "Darwin" in platform():
+        print(" + Building macOS bundle")
+        app = BUNDLE(
+            exe,
+            name='{}.app'.format(name),
+            icon=os.path.join('labslauncher', 'epi2me.icns'),
+            bundle_identifier=None)

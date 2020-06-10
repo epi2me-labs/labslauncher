@@ -24,7 +24,7 @@ build-win:
         - .\winbuild.ps1
     artifacts:
         paths:
-            - "dist/*"
+            - "dist/epi2melabs-installer.exe"
 
 .build: &build
     image: ${IMAGEUSED}
