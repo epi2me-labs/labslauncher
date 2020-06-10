@@ -324,7 +324,7 @@ class StartScreen(Screen):
                 'image_tag': self.app.docker.latest_available_tag,
                 'latest_tag': self.app.docker.latest_tag,
                 'id': self.app.docker.container.id}
-            config['Pings'] = {'enabled': self.settings["send_pings"]}
+            config['Pings'] = {'enabled': self.app.settings["send_pings"]}
             fname = os.path.join(mount, os.path.basename(ping.CONTAINER_META))
             with open(fname, 'w') as config_file:
                 config.write(config_file)
