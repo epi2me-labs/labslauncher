@@ -4,7 +4,7 @@ import os
 from PyQt5 import sip  # noqa: F401
 
 
-__version__ = "0.4.4"
+__version__ = "0.4.5"
 
 
 class Defaults(list):
