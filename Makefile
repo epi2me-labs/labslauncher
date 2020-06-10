@@ -22,8 +22,8 @@ ifeq ($(shell uname), Darwin)
     PYINSTALLERARGS = ""
 endif
 ifneq (,$(findstring MINGW64,$(shell uname)))
-    VENV=venv/Scripts/activate
-    PYWINTYPES=pypiwin32
+    VENV = venv/Scripts/activate
+    PYWINTYPES = pypiwin32
 endif
 IN_VENV=. ./$(VENV)
 
