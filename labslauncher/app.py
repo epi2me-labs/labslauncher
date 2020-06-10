@@ -1,384 +1,643 @@
-"""LabsLauncher Application."""
+"""Labslauncher main application."""
+import configparser
 import functools
 import os
+import platform
+import socket
 import sys
-import uuid
+import webbrowser
 
-import docker
 from epi2melabs import ping
-from kivy.config import Config
-Config.set('graphics', 'resizable', False)
-Config.set('graphics', 'width', 400)
-Config.set('graphics', 'height', 400)
-import kivy  # noqa: I100  kivy requires Config needs to be first
-from kivy.app import App
-from kivy.logger import Logger
-from kivy.properties import StringProperty
-from kivy.uix.label import Label
-from kivy.uix.popup import Popup
-from kivy.uix.screenmanager import ScreenManager
-from kivy.uix.settings import SettingsWithTabbedPanel
+from password_strength import PasswordPolicy
 from pkg_resources import resource_filename
-from requests.exceptions import ConnectionError
+from PyQt5.QtCore import (
+    PYQT_VERSION_STR, pyqtSignal as Signal, pyqtSlot as Slot,
+    Qt, QT_VERSION_STR, QThreadPool, QTimer)
+from PyQt5.QtGui import QIcon, QIntValidator, QPixmap
+from PyQt5.QtWidgets import (
+    QAction, QApplication, QDesktopWidget, QDialog, QFileDialog, QGridLayout,
+    QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
+    QProgressBar, QPushButton, QStackedWidget, QVBoxLayout, QWidget)
 
 import labslauncher
-from labslauncher import iconfonts, screens, util
+from labslauncher.dockerutil import DockerClient
+from labslauncher.qtext import ClickLabel, Settings, Worker
 
 
-kivy.require('1.11.1')
-iconfonts.register(
-    'default_font',
-    resource_filename('labslauncher', 'fontawesome-webfont.ttf'),
-    resource_filename('labslauncher', 'fontawesome.fontd'))
-
-
-class SpecialDocker(docker.client.DockerClient):
-    """Wrapper around docker client class to add a method."""
+class Screen(QWidget):
+    """Widgets to add to QStackedWidget which know the root."""
 
     @property
-    def is_running(self):
-        """Bool for is docker is running or not."""
-        try:
-            self.from_env().version()
-            return True
-        except ConnectionError:
-            return False
+    def app(self):
+        """Return the LabsLauncher instance."""
+        p = self
+        while not isinstance(p, LabsLauncher):
+            p = p.parent()
+        return p
 
 
-def main():
-    """Entry point for application."""
-    app = LabsLauncherApp()
-    if '--latest' in sys.argv:
-        # money patch to run 'latest' container
-        app.current_image_tag = 'latest'
-        app.safe_fetch_local_image()
-    if '--no-pings' in sys.argv:
-        app.disable_pings = True
-    app.run()
+class HomeScreen(Screen):
+    """The application home screen."""
 
+    goto_start = Signal()
 
-class LabsLauncherApp(App):
-    """LabsLauncher application class."""
+    def __init__(self, parent=None):
+        """Initialize the home screen."""
+        super().__init__(parent=parent)
+        self.layout = QVBoxLayout()
+        self.cb = QApplication.clipboard()
+        # Logo Image
+        self.logo = QLabel()
+        self.logo.setPixmap(
+            QPixmap(resource_filename(
+                'labslauncher', 'epi2me_labs_logo.png')
+            ))
+        self.logo.setAlignment(Qt.AlignCenter)
+        self.layout.addWidget(self.logo)
+        self.layout.addStretch(-1)
 
-    cstatus = StringProperty('unknown')
-    address = StringProperty('unavailable')
-    download = StringProperty('unknown')
+        # Start/stop buttons
+        self.l0 = QHBoxLayout()
+        self.start_btn = QPushButton("Start")
+        self.start_btn.clicked.connect(self.goto_start.emit)
+        self.stop_btn = QPushButton("Stop")
+        self.stop_btn.clicked.connect(self.on_stop)
+        self.l0.addWidget(self.start_btn)
+        self.l0.addWidget(self.stop_btn)
+        self.layout.addLayout(self.l0)
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the application."""
-        self.version = labslauncher.__version__
-        self.defaults = labslauncher.Settings()
-        self.disable_pings = False
-        # TODO: can read this from config
-        self.session = uuid.uuid4()
-        self.pinger = ping.Pingu(session=self.session)
-        self._heartbeat = util.Heartbeat()
-        super().__init__(*args, **kwargs)
+        # status and address
+        self.status_lbl = QLabel()
+        self.status_lbl.setAlignment(Qt.AlignCenter)
+        self.layout.addWidget(self.status_lbl)
+        self.address_lbl = ClickLabel()
+        self.address_lbl.clicked.connect(self.copy_address)
+        self.address_lbl.setAlignment(Qt.AlignCenter)
+        self.layout.addWidget(self.address_lbl)
+        self.layout.addStretch(-1)
 
-    def get_application_config(self):
-        """Return location of application configuration file."""
-        return super().get_application_config(
-            '~/.%(appname)s.ini')
+        # welcome, version labels
+        self.welcome_lbl = QLabel(
+            "Navigate to the <a href={}>Welcome page</a> "
+            "to get started.".format(self.app.settings["colab_link"]))
+        self.welcome_lbl.setOpenExternalLinks(True)
+        self.welcome_lbl.setAlignment(Qt.AlignCenter)
+        self.version_lbl = QLabel()
+        self.version_lbl.setAlignment(Qt.AlignCenter)
+        self.layout.addWidget(self.welcome_lbl)
+        self.layout.addWidget(self.version_lbl)
+        self.setLayout(self.layout)
 
-    def build(self):
-        """Build the application."""
-        self.settings_cls = SettingsWithTabbedPanel
-        self.icon = resource_filename('labslauncher', 'epi2me.ico')
-        self.title = "EPI2ME-Labs Launcher"
+        # add callbacks
+        self.app.docker.status.changed.connect(self.on_status)
+        self.app.docker.tag.changed.connect(self.on_tag)
+        self.on_status(self.app.docker.status.value)
+        self.on_tag(self.app.docker.tag.value)
 
-        if not hasattr(self, '_current_image_tag'):
-            self._current_image_tag = None
-            self.__image = None
-            if self.docker_is_running:
-                r = self.fetch_latest_remote_tag()
-                if r:  # we have the latest
-                    self._current_image_tag = r
-                else:
-                    self._current_image_tag = self.dockerhub_image_tags[0]
-            self.safe_fetch_local_image()
-        Logger.info("Image tag: {}".format(self.current_image_tag))
+    def copy_address(self):
+        """Copy server address to clipboard."""
+        self.cb.clear(mode=self.cb.Clipboard)
+        self.cb.setText(self.address_lbl.text(), mode=self.cb.Clipboard)
+        msg = QMessageBox()
+        msg.setText("Address copied")
+        msg.setInformativeText(
+            "The server address has been copied to the clipboard. "
+            "It can be used in the Google Colab interface to connect "
+            "to the notebook server.")
+        msg.setWindowTitle("Address Copied")
+        msg.exec_()
 
-        self.sm = ScreenManager()
-        self.sm.add_widget(screens.HomeScreen(name='home'))
-        self.sm.add_widget(screens.StartScreen(name='start'))
+    def on_stop(self):
+        """Stop and remove the container."""
+        self.app.docker.clear_container()
 
-        for screen in ('home', 'start'):
-            self.bind(cstatus=self.sm.get_screen(screen).setter('cstatus'))
-        self.bind(address=self.sm.get_screen('home').setter('address'))
-        if self.docker_is_running:
-            self.set_status()
+    @Slot(str)
+    def on_tag(self, value):
+        """Set the version label."""
+        self.version_lbl.setText(
+            "Launcher version: {}    Server Version: {}".format(
+                self.app.version, value))
+
+    @Slot(object)
+    def on_status(self, status):
+        """Set state when container status changes."""
+        old, new = status
+        start_text = "Restart"
+        stop_text = "Stop"
+        extra_msg = ""
+        if new in ("created", "exited"):
+            color = "Crimson"
+            stop_text = "Clear"
+            extra_msg = "<br>(try restarting)"
+        elif new == "unknown":
+            color = "Orange"
+            extra_msg = "<br>(waiting for docker)"
+        elif new == "running":
+            color = "DarkGreen"
         else:
-            self.cstatus = "Docker not running"
-        return self.sm
+            color = "MediumTurquoise"
+            start_text = "Start"
+        self.start_btn.setText(start_text)
+        self.start_btn.setEnabled(new != "unknown")
+        self.stop_btn.setText(stop_text)
+        self.stop_btn.setEnabled(
+            new not in ("inactive", "unknown"))
+        self.status_lbl.setText(
+            'Server status: <b><font color="{}">{}</font></b>{}'.format(
+                color, new, extra_msg))
 
-    def build_config(self, config):
-        """Set the default values for the config."""
-        self.use_kivy_settings = False
-        config.read(self.get_application_config())
-        defaults = {obj["key"]: obj["default"] for obj in self.defaults}
-        config.setdefaults(self.defaults.section, defaults)
-
-    def build_settings(self, settings):
-        """Add custom section to the default configuration object."""
-        settings = labslauncher.Settings()
-        settings.add_json_panel(
-            'Settings', self.config, data=settings.kivy_json)
-
-    def get_config(self, key):
-        """Get a config item.
-
-        :param key: the item name.
-
-        """
-        return self.config.get(self.defaults.section, key)
-
-    def set_config(self, key, value):
-        """Set a config item.
-
-        :param key: the item name.
-        :param value: new value of item.
-
-        """
-        self.config.set(self.defaults.section, key, value)
-        self.config.write()
-
-    @property
-    def dockerhub_image_tags(self):
-        """All available image tags on dockerhub."""
-        return util.get_image_tags(self.get_config("container"))
-
-    @property
-    def docker(self):
-        """Local docker instance."""
-        return SpecialDocker.from_env()
-
-    @staticmethod
-    def docker_not_running_popup():
-        """Create popup if docker service cannot be contacted."""
-        msg = "Could not connect to docker."
-        popup = Popup(
-            title='Error:',
-            content=Label(text=msg, shorten=True),
-            size_hint=(0.9, 0.5))
-        popup.open()
-
-    @property
-    def docker_is_running(self):
-        """Check if docker is running or not."""
-        return self.docker.is_running
-
-    @property
-    def image_name(self):
-        """Return the image name for the requested tag."""
-        if self.current_image_tag is None:
-            raise ValueError("No local tag.")
-        return "{}:{}".format(
-            self.get_config("container"), self.current_image_tag)
-
-    def fetch_latest_remote_tag(self):
-        """Scrape the latest remote tag available locally."""
-        return util.newest_tag(
-            self.get_config("container"),
-            tags=self.dockerhub_image_tags,
-            client=self.docker)
-
-    @property
-    def current_image_tag(self):
-        """Get the current image tag."""
-        if self._current_image_tag is None and self.docker_is_running:
-            self._current_image_tag = self.fetch_latest_remote_tag()
-        return self._current_image_tag
-
-    @current_image_tag.setter
-    def current_image_tag(self, tag):
-        """Change the current image tag."""
-        self._current_image_tag = tag
-
-    def fetch_local_image(self):
-        """Get the docker image."""
-        try:
-            return self.docker.images.get(self.image_name)
-        except Exception:
-            raise docker.errors.ImageNotFound("No local image available.")
-
-    def safe_fetch_local_image(self):
-        """Set image attribute of this class.
-
-        If the image is not found locally sets `None`.
-        """
-        try:
-            self.image = self.fetch_local_image()
-        except docker.errors.ImageNotFound:
-            self.image = None
-
-    @property
-    def image(self):
-        """Get the docker image object used by the app."""
-        return self.__image
-
-    @image.setter
-    def image(self, image):
-        """Set the docker image object used by the app."""
-        self.__image = image
-
-    def ensure_image(self):
-        """Set image attribute of this class.
-
-        If the image is not found locally the image is pulled.
-        """
-        self.image = None
-        try:
-            self.image = self.fetch_local_image()
-        except docker.errors.ImageNotFound:
-            self.image = self.pull_tag(self.current_image_tag)
-
-    @property
-    def can_update(self):
-        """Determine if an updated image is available."""
-        return self.dockerhub_image_tags[0] != self.current_image_tag
-
-    def update_image(self):
-        """Update the image to the newest tag."""
-        self.image = None
-        self.current_image_tag = self.dockerhub_image_tags[0]
-        self.ensure_image()
-        # if things succeeded this shouldn't do anything, else it will reset
-        self.current_image_tag = self.fetch_latest_remote_tag()
-        # TODO: this is a bit of a hack, should setup a Property and bind
-        self.sm.get_screen('home').ids.versionlbl.text = \
-            "Launcher Version: {}    Server Version: {}".format(
-                self.version, self.current_image_tag)
-
-    @property
-    def container(self):
-        """Return the server container if one is present, else None."""
-        if self.docker_is_running:
-            for cont in self.docker.containers.list(True):
-                if cont.name == self.get_config("server_name"):
-                    return cont
-        return None
-
-    def set_status(self):
-        """Set the container status property."""
-        c = self.container
-        new_status = 'inactive'
-        if c is not None:
-            new_status = c.status
-        if new_status != self.cstatus:
-            self.cstatus = new_status
-
-    def on_cstatus(self, *args):
-        """Update state on container status change."""
-        # find port and token
-        new_address = 'Server address unavailable'
-        if self.container is not None and self.cstatus == 'running':
-            cargs = self.container.__dict__['attrs']['Args']
+        address = ""
+        self.address_lbl.setClickable(False)
+        container = self.app.docker.container
+        if container is not None and new == 'running':
+            cargs = container.__dict__['attrs']['Args']
             for c in cargs:
                 if c.startswith('--port='):
                     port = int(c.split('=')[1])
                 elif c.startswith('--NotebookApp.token='):
                     token = c.split('=')[1]
-            new_address = "http://localhost:{}?token={}".format(port, token)
-        self.address = new_address
+            self.address_lbl.setClickable(True)
+            address = "http://localhost:{}?token={}".format(port, token)
+        self.address_lbl.setText(address)
+        self.repaint()
 
-    def clear_container(self, *args):
-        """Kill and remove the server container."""
-        cont = self.container
-        if cont is not None:
-            if not self.disable_pings:
-                self.pinger.send_container_ping('stop', cont, self.image_name)
-            if cont.status == "running":
-                cont.kill()
-            cont.remove()
-        # no harm stopping regardless of conditionals above
-        self._heartbeat.stop()
-        self.set_status()
 
-    @staticmethod
-    def check_inputs(mount, token, port):
-        """Create popup warning box if mount/token/port are invalid."""
-        msg = None
-        if not os.path.exists(mount):
-            msg = "Mount path does not exist"
-        elif not token:
-            msg = "Please enter a value for 'Token'"
-        elif not port:
-            msg = "Port must be a number."
-        elif token.isnumeric():
-            msg = "Token must contain letters"
-        if msg is not None:
-            popup = Popup(
-                title='Invalid Settings:',
-                content=Label(text=msg, shorten=True),
-                size_hint=(0.9, 0.5))
-            popup.open()
-            return False
+class StartScreen(Screen):
+    """Screen to set options and start server."""
+
+    goto_home = Signal()
+    path_help = (
+        "The data path is the location on your computer you\n"
+        "wish to be readable (and writeable) within the notebook\n"
+        "environment. It will be available in the environment under\n"
+        "`/epi2melabs`.")
+    token_help = (
+        "A secret token used to connect to the notebook server. Anyone\n"
+        "with this token will be able to connect to the server, and \n"
+        "therefore modify files under the data location. We recommend\n"
+        "changing this from the default value.")
+    port_help = (
+        "The network port to used to communicate between web-browser\n"
+        "and notebook server.")
+    aux_port_help = (
+        "An auxialiary network port used for secondary applications\n"
+        "e.g. for use by the Pavian metagenomics dataset explorer.")
+
+    def __init__(self, parent=None):
+        """Initialize the screen."""
+        super().__init__(parent=parent)
+        self.token_policy = PasswordPolicy.from_names(
+            length=8, uppercase=1, numbers=1)
+        self.onlyInt = QIntValidator()
+        self.layout = QVBoxLayout()
+
+        # header
+        self.l0 = QHBoxLayout()
+        self.header_lbl = QLabel("Start server")
+        self.l0.addWidget(self.header_lbl)
+        self.layout.addLayout(self.l0)
+
+        # data path, token, port
+        self.l1 = QGridLayout()
+        self.path_btn = QPushButton('Select folder')
+        self.path_btn.clicked.connect(self.select_path)
+        self.path_txt = QLineEdit(text=self.app.settings['data_mount'])
+        self.path_txt.setToolTip(self.path_help)
+        self.path_txt.setReadOnly(True)
+        self.l1.addWidget(self.path_btn, 0, 0)
+        self.l1.addWidget(self.path_txt, 0, 1)
+
+        self.token_lbl = QLabel('Token:')
+        self.token_txt = QLineEdit(text=self.app.settings['token'])
+        self.token_txt.setMaxLength(16)
+        self.token_txt.setToolTip(self.token_help)
+        self.port_lbl = QLabel('Port:')
+        self.port_txt = QLineEdit(text=str(self.app.settings['port']))
+        self.port_txt.setValidator(self.onlyInt)
+        self.port_txt.setToolTip(self.port_help)
+        self.aux_port_lbl = QLabel('Aux. Port:')
+        self.aux_port_txt = QLineEdit(text=str(self.app.settings['aux_port']))
+        self.aux_port_txt.setValidator(self.onlyInt)
+        self.aux_port_txt.setToolTip(self.aux_port_help)
+
+        self.l1.addWidget(self.token_lbl, 1, 0)
+        self.l1.addWidget(self.token_txt, 1, 1)
+        self.l1.addWidget(self.port_lbl, 2, 0)
+        self.l1.addWidget(self.port_txt, 2, 1)
+        self.l1.addWidget(self.aux_port_lbl, 3, 0)
+        self.l1.addWidget(self.aux_port_txt, 3, 1)
+        self.layout.addLayout(self.l1)
+
+        # spacer
+        self.layout.insertStretch(-1)
+
+        # start, update, back
+        self.l3 = QHBoxLayout()
+        self.start_btn = QPushButton('Start')
+        self.start_btn.clicked.connect(self.validate_and_start)
+        self.update_btn = QPushButton('Update')
+        self.update_btn.clicked.connect(self.pull_image)
+        self.back_btn = QPushButton('Back')
+        self.back_btn.clicked.connect(self.goto_home.emit)
+
+        self.l3.addWidget(self.start_btn)
+        self.l3.addWidget(self.update_btn)
+        self.l3.addWidget(self.back_btn)
+        self.layout.addLayout(self.l3)
+
+        self.setLayout(self.layout)
+
+        self.app.docker.status.changed.connect(self.on_status)
+        self.on_status(self.app.docker.status.value)
+
+    def select_path(self):
+        """Open data path dialog and set state."""
+        starting_dir = self.path_txt.text()
+        path = QFileDialog.getExistingDirectory(
+            None, 'Open working directory', starting_dir,
+            QFileDialog.ShowDirsOnly)
+        if path != "":  # did not press cancel
+            self.path_txt.setText(path)
+            self.app.settings["data_mount"] = path
+
+    def validate_and_start(self):
+        """Start the container."""
+        mount = self.path_txt.text()
+        token = self.token_txt.text()
+        port = self.port_txt.text()
+        aux_port = self.aux_port_txt.text()
+        # validate inputs
+        valid = all([
+            mount != "",
+            os.path.isdir(mount),
+            len(self.token_policy.test(token)) == 0,
+            self.port_txt.hasAcceptableInput() and int(port) > 1024,
+            self.aux_port_txt.hasAcceptableInput() and int(aux_port) > 1024,
+            port != aux_port])
+
+        if valid:
+            if self.app.docker.latest_available_tag is None:
+                self.pull_image(callback=self._start_container)
+            else:
+                self._start_container()
         else:
-            return True
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Information)
+            msg.setText("Input error")
+            msg.setInformativeText("The inputs given are invalid.")
+            msg.setWindowTitle("Input error")
+            msg.setDetailedText(
+                "1. A valid folder must be given.\n"
+                "2. The token must be 8 characters and include uppercase, "
+                "lowercase and numbers.\n"
+                "3. The ports must be >1024.\n"
+                "4. Port and Aux. port must be distinct.")
+            msg.exec_()
 
-    def start_container(self, mount, token, port):
-        """Start the server container, removing a previous one if necessary.
+    def _start_container(self):
+        """Start container."""
+        mount = self.path_txt.text()
+        token = self.token_txt.text()
+        port = self.port_txt.text()
+        aux_port = self.aux_port_txt.text()
 
-        .. note:: The behaviour of docker.run is that a pull will be invoked if
-            the image is not available locally. To ensure more controlled
-            behaviour check .fetch_local_image() first.
+        for btn in (self.start_btn, self.update_btn):
+            btn.setEnabled(False)
+        self.app.docker.start_container(mount, token, port, aux_port)
+        self.repaint()
+
+        if self.app.docker.status.value[1] != "running":
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Critical)
+            msg.setText("Server start error")
+            msg.setInformativeText("An error occurred starting the server.")
+            msg.setWindowTitle("Server Error")
+            msg.setDetailedText(self.app.docker.last_failure)
+            msg.exec_()
+        else:
+            config = configparser.ConfigParser()
+            config['Host'] = {
+                'hostname': socket.gethostname(),
+                'operating_system': platform.platform()}
+            config['Container'] = {
+                'mount': mount, 'port': port, 'aux_port': aux_port,
+                'image_tag': self.app.docker.latest_available_tag,
+                'latest_tag': self.app.docker.latest_tag,
+                'id': self.app.docker.container.id}
+            config['Pings'] = {'enabled': self.settings["send_pings"]}
+            fname = os.path.join(mount, os.path.basename(ping.CONTAINER_META))
+            with open(fname, 'w') as config_file:
+                config.write(config_file)
+
+    def pull_image(self, *args, callback=None):
+        """Pull new image in a thread.
+
+        :param callback: function to run when pull as completed.
         """
-        host_only = self.get_config('docker_restrict')
-        if not self.check_inputs(mount, token, port):
-            return
+        self.worker = Worker(self.app.docker.pull_image)
+        self.worker.setAutoDelete(True)
+        self.app.closing.connect(self.worker.stop)
 
-        self.clear_container()
-        CMD = self.get_config("container_cmd").split() + [
-            "--NotebookApp.token={}".format(token),
-            "--port={}".format(port),
-            ]
+        self.worker.signals.finished.connect(
+            lambda: self.update_btn.setEnabled(
+                self.app.docker.update_available))
 
-        try:
-            # note: colab requires the port in the container to be equal
-            ports = {int(port): int(port)}
-            if host_only:
-                ports = {int(port): ('127.0.0.1', int(port))}
-            Logger.info("Docker: {}".format(ports))
-            self.docker.containers.run(
-                self.image_name,
-                CMD,
-                detach=True,
-                ports=ports,
-                environment=['JUPYTER_ENABLE_LAB=yes'],
-                volumes={
-                    mount: {
-                        'bind': self.get_config("data_bind"), 'mode': 'rw'}},
-                name=self.get_config("server_name"))
-        except Exception as e:
-            # TODO: better feedback on failure
-            print(e)
+        if callback is not None:
+            self.worker.signals.finished.connect(callback)
+        self.progress_dlg = DownloadDialog(
+            progress=self.worker.signals.progress, parent=self)
+        self.progress_dlg.finished.connect(self.worker.stop)
+        self.worker.signals.finished.connect(self.progress_dlg.close)
+
+        self.app.pool.start(self.worker)
+        self.progress_dlg.show()
+
+    @Slot(float)
+    def on_download(self, value):
+        """Set state when download progress changes."""
+        self.header_lbl.setText(
+            "Start server: (downloading - {:.1f}%)".format(value))
+
+    @Slot(object)
+    def on_status(self, status):
+        """Set state when container status changes."""
+        old, new = status
+        msg = ""
+        start_text = "Start"
+        if new == "inactive":
             pass
-        self.set_status()
-        if not self.disable_pings:
-            self.pinger.send_container_ping(
-                'start', self.container, self.image_name)
-            callback = functools.partial(
-                self.pinger.send_container_ping,
-                'update', self.container, self.image_name)
-            self._heartbeat.start(callback)
+        elif new in ("created", "exited"):
+            msg = " (last attempt failed)"
+            start_text = "Restart"
+        elif new == "running":
+            start_text = "Restart"
+            self.app.show_home()
 
-    def pull_tag(self, tag):
-        """Pull an image tag.
+        self.start_btn.setText(start_text)
+        self.start_btn.setEnabled(new != "unknown")
+        self.header_lbl.setText('Start server: {}'.format(msg))
+        self.update_btn.setEnabled(
+            self.app.docker.update_available and new != "unknown")
+        self.repaint()
 
-        :param tag: tag to fetch.
 
-        :returns: the image object.
+class DownloadDialog(QDialog):
+    """About dialog."""
 
+    def __init__(self, progress, parent=None):
+        """Initialize the dialog."""
+        super().__init__(parent)
+        self.setWindowTitle("Downloading server.")
+        self.layout = QVBoxLayout()
+        self.lbl = QLabel("Downloading server components")
+        self.layout.addWidget(self.lbl)
+        self.pbar = QProgressBar(self)
+        self.layout.addWidget(self.pbar)
+        self.setLayout(self.layout)
+        progress.connect(self.on_progress)
+        self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
+        self.setWindowFlags(self.windowFlags() | Qt.Tool)
+        self.setAttribute(Qt.WA_MacAlwaysShowToolWindow)
+        self.setModal(True)
+        self.resize(300, 50)
+
+    @Slot(float)
+    def on_progress(self, value):
+        """Update progress bar.
+
+        :param value: download progress.
         """
-        image_tag = util.get_image_tag(self.get_config("container"), tag)
-        total = image_tag['full_size']
+        self.pbar.setValue(value)
 
-        # to get feedback we need to use the low-level API
-        self.download = '{:.1f}%'.format(0)
-        for current, total in util.pull_with_progress(
-                self.get_config("container"), tag):
-            self.download = '{:.1f}%'.format(100 * current / total)
-        self.download = "100%"
-        image = self.docker.images.get(
-            '{}:{}'.format(self.get_config("container"), tag))
-        return image
+        extra = ""
+        size = self.parent().app.docker.total_size
+        if size is not None:
+            size = size / 1024 / 1024 / 1024
+            extra = "({:.1f}Gb)".format(size)
+        self.lbl.setText("Downloading server components {}".format(extra))
+
+
+class UpdateScreen(Screen):
+    """Screen to display message that image update is available."""
+
+    goto_start = Signal()
+    update_text = (
+        "<b>Update available</b><br>"
+        "An update to the notebook server is available. Updating the "
+        "notebook server will allowed continued use to the most recent "
+        "EPI2ME Labs notebooks on GitHub. Please press the Update "
+        "button on the main screen to update.<br><br>"
+        "Current version: {}.<br>"
+        "Latest version: {}.")
+
+    def __init__(self, parent=None):
+        """Initialize the screen."""
+        super().__init__(parent=parent)
+
+        self.layout = QVBoxLayout()
+
+        self.update_lbl = QLabel()
+        self.layout.addWidget(self.update_lbl)
+        self.layout.insertStretch(-1)
+
+        self.l0 = QHBoxLayout()
+        self.layout.insertStretch(-1)
+        self.dismiss_btn = QPushButton("OK")
+        self.dismiss_btn.clicked.connect(self.goto_start.emit)
+        self.l0.addWidget(self.dismiss_btn)
+        self.layout.addLayout(self.l0)
+
+        self.setLayout(self.layout)
+
+
+class LabsLauncher(QMainWindow):
+    """Main application window."""
+
+    closing = Signal(bool)
+
+    def __init__(self, app):
+        """Initialize the main window."""
+        super().__init__()
+        self.version = labslauncher.__version__
+        self.about = About(self.version)
+
+        self.setWindowTitle("EPI2ME Labs Launcher")
+        # display in centre of screen and fixed size
+        qtRectangle = self.frameGeometry()
+        centerPoint = QDesktopWidget().availableGeometry().center()
+        qtRectangle.moveCenter(centerPoint)
+        self.move(qtRectangle.topLeft())
+        self.setFixedSize(400, 400)
+
+        self.settings = Settings(labslauncher.Defaults())
+        self.settings.override()
+        app.aboutToQuit.connect(self.settings.qsettings.sync)
+
+        self.pool = QThreadPool()
+        app.aboutToQuit.connect(self.pool.waitForDone)
+
+        fixed_tag = self.settings["fixed_tag"]
+        if fixed_tag == "":
+            fixed_tag = None
+        self.docker = DockerClient(
+            self.settings["image_name"], self.settings["server_name"],
+            self.settings["data_bind"], self.settings["container_cmd"],
+            host_only=self.settings["docker_restrict"],
+            fixed_tag=fixed_tag)
+
+        self.ping_timer = QTimer(self)
+        self.pinger = ping.Pingu()
+        self.docker.status.changed.connect(self.on_status)
+        self.on_status(self.docker.status.value, boot=True)
+
+        self.layout = QVBoxLayout()
+
+        self.file_menu = self.menuBar().addMenu("&File")
+        self.exit_act = QAction("Exit", self)
+        self.exit_act.triggered.connect(self.close)
+        self.file_menu.addAction(self.exit_act)
+        self.help_menu = self.menuBar().addMenu("&Help")
+        self.about_act = QAction('About', self)
+        self.about_act.triggered.connect(self.about.show)
+        self.help_menu.addAction(self.about_act)
+        self.help_act = QAction("Help", self)
+        self.help_act.triggered.connect(self.show_help)
+        self.help_menu.addAction(self.help_act)
+
+        self.stack = QStackedWidget()
+        self.home = HomeScreen(parent=self)
+        self.start = StartScreen(parent=self)
+        self.update = UpdateScreen(parent=self)
+        self.stack.addWidget(self.home)
+        self.stack.addWidget(self.start)
+        self.stack.addWidget(self.update)
+        self.layout.addWidget(self.stack)
+
+        w = QWidget()
+        w.setLayout(self.layout)
+        self.setCentralWidget(w)
+
+        self.home.goto_start.connect(self.show_start)
+        self.start.goto_home.connect(self.show_home)
+        self.update.goto_start.connect(
+            functools.partial(self.stack.setCurrentIndex, 1))
+        self.show_home()
+
+    def closeEvent(self, event):
+        """Emit closing signal on window close."""
+        self.closing.emit(True)
+        super().closeEvent(event)
+
+    def show_help(self):
+        """Open webbrowser with application help."""
+        webbrowser.open(self.settings['colab_help'])
+
+    def show_home(self):
+        """Move to the home screen."""
+        self.stack.setCurrentIndex(0)
+
+    def show_start(self):
+        """Move to the start screen."""
+        self.start.update_btn.setEnabled(self.docker.update_available)
+        if self.docker.update_available:
+            cur = self.docker.latest_available_tag
+            new = self.docker.latest_tag
+            self.update.update_lbl.setText(
+                self.update.update_text.format(cur, new))
+            self.update.update_lbl.setWordWrap(True)
+            self.stack.setCurrentIndex(2)
+        else:
+            self.stack.setCurrentIndex(1)
+
+    @Slot(object)
+    def on_status(self, status, boot=False):
+        """Respond to container status changes."""
+        old, new = status
+        if old == new:
+            return
+        elif new == "running":
+            if self.settings["send_pings"]:
+                self.ping('start')
+                callback = functools.partial(self.ping, 'update')
+                self.ping_timer.setInterval(1000*60*20)  # 20 minutes
+                self.ping_timer.start()
+                self.ping_timer.timeout.connect(callback)
+        elif old == "running" and new == "inactive":
+            if self.settings["send_pings"]:
+                self.ping_timer.stop()
+                self.ping('stop')
+        elif new == "unknown":
+            self.ping_timer.stop()  # might not be required
+            msg = QMessageBox(self)
+            msg.setWindowTitle("Docker error")
+            msg.setIcon(QMessageBox.Critical)
+            msg.setText("Docker Error")
+            msg.setInformativeText(
+                "The application cannot communicate with docker.\n"
+                "Please ensure that docker is running\n")
+            msg.exec_()
+        elif old == "unknown" and not boot:
+            msg = QMessageBox(self)
+            msg.setWindowTitle("Docker connection")
+            msg.setText("Docker connection")
+            msg.setInformativeText(
+                "Connection to docker established.")
+            msg.exec_()
+
+    def moveEvent(self, event):
+        """Move the progress dialog when main window moves."""
+        super().moveEvent(event)
+        if hasattr(self, 'start') and hasattr(self.start, 'progress_dlg'):
+            diff = event.pos() - event.oldPos()
+            geo = self.start.progress_dlg.geometry()
+            geo.moveTopLeft(geo.topLeft() + diff)
+            self.start.progress_dlg.setGeometry(geo)
+
+    def ping(self, state):
+        """Send a status ping.
+
+        :param state: the container state (start, update, stop).
+        """
+        if "unknown" in self.docker.status.value:
+            # the app just started
+            return
+        stats = None
+        if state == 'stop':
+            stats = self.docker.final_stats
+        else:
+            stats = self.docker.container.stats(stream=False)
+        self.pinger.send_container_ping(
+            state, stats, self.docker.image_name)
+
+
+class About(QDialog):
+    """About dialog."""
+
+    def __init__(self, version, parent=None):
+        """Initialize the dialog.
+
+        :param version: application version string.
+        """
+        super().__init__(parent)
+        self.setWindowTitle("About")
+        self.layout = QVBoxLayout()
+        self.label = QLabel(
+            "<b>EPI2ME Labs Launcher {}</b><br>"
+            "Copyright Oxford Nanopore Technologies Limited 2020<br>"
+            "Mozilla Public License Version 2.0<br><br>"
+            "The program include PyQt5 licensed under the GNU GPL v3.<br>"
+            "PyQt5 {}<br>Qt {}<br>"
+            "".format(version, PYQT_VERSION_STR, QT_VERSION_STR))
+        self.layout.addWidget(self.label)
+        self.setLayout(self.layout)
+
+
+def main():
+    """Entry point to run application."""
+    app = QApplication(sys.argv)
+    app_icon = QIcon()
+    app_icon.addFile(resource_filename('labslauncher', 'epi2me.png'))
+    app.setWindowIcon(app_icon)
+    launcher = LabsLauncher(app)
+    launcher.show()
+    sys.exit(app.exec_())

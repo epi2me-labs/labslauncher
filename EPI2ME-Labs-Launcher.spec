@@ -1,6 +1,13 @@
 # -*- mode: python ; coding: utf-8 -*-
+import pkg_resources
+from platform import platform
+import sys
+
+print("Running pyinstaller script with args:")
+print("    - ", ' '.join(sys.argv))
+print()
+
 def Entrypoint(dist, group, name, **kwargs):
-    import pkg_resources
 
     # get toplevel packages of distribution from metadata
     def get_toplevel(dist):
@@ -34,22 +41,45 @@ def Entrypoint(dist, group, name, **kwargs):
         **kwargs
     )
 
-block_cipher = None
 a = Entrypoint(
     'labslauncher', 'console_scripts', 'labslauncher',
-    hiddenimports=['cython'],
+    hiddenimports=[],
     datas=[
         ('labslauncher/{}'.format(x), 'labslauncher')
-        for x in ['labslauncher.kv', 'epi2me.ico', 'fontawesome-webfont.ttf', 'fontawesome.fontd', 'EPI2ME_labs_logo_RGB_negative_large.png']]
+        for x in ['epi2me.png', 'epi2me.ico', 'epi2me.icns', 'epi2me_labs_logo.png']]
 ) 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
-exe = EXE(
-    pyz, a.scripts, a.binaries, a.zipfiles, a.datas, [],
-    name='EPI2ME-Labs-Launcher',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
-    console=True)
+pyz = PYZ(a.pure, a.zipped_data, cipher=None)
+
+name = 'EPI2ME-Labs-Launcher'
+common_args = { 
+    'name': name,
+    'strip': False, 'upx': True, 'upx_exclude': []}
+exe_kwargs = {
+    'debug': False,
+    'bootloader_ignore_signals': False,
+    'runtime_tmpdir': None,
+    'console': False, 'windowed': True,
+    'icon': os.path.join('labslauncher', 'epi2me.ico')}
+
+if '--onefile' in sys.argv:
+    print(" + Building single-file dist")
+    exe = EXE(
+        pyz, a.scripts, a.binaries, a.zipfiles, a.datas, [],
+        **exe_kwargs, **common_args)
+else:
+    print(" + Building a single-directory dist")
+    exe = EXE(
+        pyz, a.scripts, [],
+        exclude_binaries=True,
+        **exe_kwargs, **common_args)
+    exe = COLLECT(
+        exe, a.binaries, a.zipfiles, a.datas,
+        **common_args)
+
+    if "Darwin" in platform():
+        print(" + Building macOS bundle")
+        app = BUNDLE(
+            exe,
+            name='{}.app'.format(name),
+            icon=os.path.join('labslauncher', 'epi2me.icns'),
+            bundle_identifier=None)

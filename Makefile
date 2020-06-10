@@ -4,41 +4,53 @@ MAJOR    ?= 0
 MINOR    ?= 0
 SUB      ?= 0
 PATCH    ?= 0
-VERSION   ="$(MAJOR).$(MINOR).$(SUB)"
+VERSION   = "$(MAJOR).$(MINOR).$(SUB)"
 CODENAME ?= $(shell awk -F= '/CODENAME/{print $$2}' /etc/lsb-release)
-DEB	  ="$(PROJECT)-$(MAJOR).$(MINOR).$(SUB)-$(PATCH)~$(CODENAME).deb"
+DEB	      = "$(PROJECT)-$(MAJOR).$(MINOR).$(SUB)-$(PATCH)~$(CODENAME).deb"
 MD5SUM    = md5sum
 SEDI      = sed -i
+PYTHON   ?= python
+VENV      = venv/bin/activate
+
+PYQT5SIP  = $(shell grep pyqt5-sip requirements.txt)
+PYWINTYPES=
+PYINSTALLERARGS=--onefile
 
 ifeq ($(shell uname), Darwin)
-        MD5SUM = md5 -r
-        SEDI   = sed -i ""
+    MD5SUM = md5 -r
+    SEDI   = sed -i ""
+    PYINSTALLERARGS = ""
 endif
+ifneq (,$(findstring MINGW64,$(shell uname)))
+    VENV = venv/Scripts/activate
+    PYWINTYPES = pypiwin32
+endif
+IN_VENV=. ./$(VENV)
 
-PYTHON ?= python
 
-IN_VENV=. ./venv/bin/activate
-
-venv/bin/activate:
+$(VENV):
+	echo "'"$(shell uname)"'"
 	test -d venv || virtualenv venv --python=$(PYTHON) --prompt "(build) "
 	${IN_VENV} && pip install pip --upgrade
+	${IN_VENV} && pip install ${PYQT5SIP} ${PYWINTYPES}
 	${IN_VENV} && pip install -r requirements.txt
 
-testenv: venv/bin/activate
+testenv: $(VENV)
 
-test: venv/bin/activate
+test: $(VENV)
 	${IN_VENV} && pip install flake8 flake8-rst-docstrings flake8-docstrings flake8-import-order
 	${IN_VENV} && flake8 labslauncher \
 		--import-order-style google --application-import-names labslauncher \
-		--statistics --per-file-ignores='labslauncher/app.py:E402'
+		--statistics
 
-dist/EPI2ME-Labs-Launcher: venv/bin/activate
+
+dist/EPI2ME-Labs-Launcher: $(VENV)
 	${IN_VENV} && python setup.py develop
-	${IN_VENV} && pyinstaller EPI2ME-Labs-Launcher.spec
+	${IN_VENV} && pyinstaller EPI2ME-Labs-Launcher.spec ${PYINSTALLERARGS}
 
 
 .PHONY: run
-run: venv/bin/activate
+run: $(VENV)
 	${IN_VENV} && python setup.py develop && labslauncher
 
 
@@ -56,7 +68,7 @@ deb: clean dist/EPI2ME-Labs-Launcher
 	mkdir -p deb-src/usr/share/applications
 	cp dist/EPI2ME-Labs-Launcher deb-src/usr/local/bin/
 	cp labslauncher.desktop deb-src/usr/share/applications
-	cp labslauncher/EPI2ME.png deb-src/usr/share/applications
+	cp labslauncher/epi2me.png deb-src/usr/share/applications/epi2me.png
 	cp -rp deb-src/ tmp/
 	$(SEDI) "s/PROJECT/$(PROJECT)/g"   tmp/DEBIAN/control
 	$(SEDI) "s/MAJOR/$(MAJOR)/g"       tmp/DEBIAN/control
