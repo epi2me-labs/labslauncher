@@ -7,10 +7,12 @@ import sys
 import traceback
 
 from PyQt5 import sip  # noqa: F401
+from PyQt5.QtWidgets import QMessageBox
 
 
 __version__ = "0.4.5"
 __UNCAUGHT__ = "Uncaught exception:"
+__LOGDIR__ = os.path.expanduser(os.path.join('~', '.labslauncher'))
 
 
 def get_named_logger(name):
@@ -36,12 +38,27 @@ def log_level():
     return parser
 
 
-def except_to_log(logger):
-    """Set logging of uncaught exceptions."""
+def handle_unhandled(logger=None):
+    """Set logging of uncaught exceptions and exit application."""
     def _except_hook(logger, orig_hook, exctype, value, tb):
         lines = ''.join(traceback.format_exception(exctype, value, tb))
-        logger.critical("{}\n{}".format(__UNCAUGHT__, lines))
-        orig_hook(exctype, value, tb)
+        if logger is not None:
+            logger.critical("{}\n{}".format(__UNCAUGHT__, lines))
+        sys.__excepthook__(exctype, value, tb)
+        # overriding sys.excepthook confuses pyqt and the program does
+        # not die. Let's force that.
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Critical)
+        msg.setText("EPI2ME Labs Launcher error")
+        msg.setWindowTitle("Launcher Error")
+        msg.setInformativeText(
+            "An unexpected error occurred. Please include the log file at:\n\n"
+            "{}\n\n"
+            "when contacting Oxford Nanopore Technologies support. The "
+            "application will now exit.".format(__LOGDIR__))
+        msg.setDetailedText(lines)
+        msg.exec_()
+        sys.exit()
     sys.excepthook = functools.partial(_except_hook, logger, sys.excepthook)
 
 

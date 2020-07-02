@@ -4,6 +4,7 @@ import functools
 import json
 import os
 import platform
+import traceback
 
 from cachetools import cached, TTLCache
 import docker
@@ -341,10 +342,17 @@ class DockerClient():
                     mount: {
                         'bind': self.data_bind, 'mode': 'rw'}},
                 name=self.server_name)
-        except Exception as e:
-            self.last_failure = str(e).replace("b'", "").replace("'\"", "\"")
-            self.logger.warning(
-                    "Failed to start container:\n{}".format(self.last_failure))
+        except Exception:
+            self.logger.exception(
+                    "Failed to start container.")
+            self.last_failure = traceback.format_exc()
+            self.last_failure_type = 'unknown'
+            win_fs_msg = "Filesharing has been cancelled"
+            osx_fs_msg = "Mounts denied"
+            if (win_fs_msg in self.last_failure) \
+                    or (osx_fs_msg in self.last_failure):
+                self.logger.warning("Detected that sharing was disabled.")
+                self.last_failure_type = "file_share"
         else:
             self.logger.info("Container started.")
         self.final_stats = None
