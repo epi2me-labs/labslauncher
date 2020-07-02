@@ -1,6 +1,9 @@
 """Labslauncher main application."""
+import argparse
 import configparser
 import functools
+import logging
+import logging.handlers
 import os
 import platform
 import socket
@@ -186,6 +189,7 @@ class StartScreen(Screen):
     def __init__(self, parent=None):
         """Initialize the screen."""
         super().__init__(parent=parent)
+        self.logger = self.app.logger
         self.token_policy = PasswordPolicy.from_names(
             length=8, uppercase=1, numbers=1)
         self.onlyInt = QIntValidator()
@@ -281,6 +285,7 @@ class StartScreen(Screen):
             else:
                 self._start_container()
         else:
+            self.logger.warning("Container start options were invalid.")
             msg = QMessageBox(self)
             msg.setIcon(QMessageBox.Information)
             msg.setText("Input error")
@@ -307,6 +312,7 @@ class StartScreen(Screen):
         self.repaint()
 
         if self.app.docker.status.value[1] != "running":
+            self.logger.error("Failed to start container.")
             msg = QMessageBox(self)
             msg.setIcon(QMessageBox.Critical)
             msg.setText("Server start error")
@@ -315,6 +321,7 @@ class StartScreen(Screen):
             msg.setDetailedText(self.app.docker.last_failure)
             msg.exec_()
         else:
+            self.logger.info("Container started, writing config to mount.")
             config = configparser.ConfigParser()
             config['Host'] = {
                 'hostname': socket.gethostname(),
@@ -328,12 +335,14 @@ class StartScreen(Screen):
             fname = os.path.join(mount, os.path.basename(ping.CONTAINER_META))
             with open(fname, 'w') as config_file:
                 config.write(config_file)
+            self.logger.info("Container started and primed.")
 
     def pull_image(self, *args, callback=None):
         """Pull new image in a thread.
 
         :param callback: function to run when pull as completed.
         """
+        self.logger.info("Starting thread to pull image.")
         self.worker = Worker(self.app.docker.pull_image)
         self.worker.setAutoDelete(True)
         self.app.closing.connect(self.worker.stop)
@@ -455,11 +464,14 @@ class LabsLauncher(QMainWindow):
 
     closing = Signal(bool)
 
-    def __init__(self, app):
+    def __init__(self, app, settings):
         """Initialize the main window."""
         super().__init__()
+        self.settings = settings
         self.version = labslauncher.__version__
         self.about = About(self.version)
+        self.logger = labslauncher.get_named_logger("Launcher")
+        self.logger.info("Starting application.")
 
         self.setWindowTitle("EPI2ME Labs Launcher")
         # display in centre of screen and fixed size
@@ -469,8 +481,6 @@ class LabsLauncher(QMainWindow):
         self.move(qtRectangle.topLeft())
         self.setFixedSize(400, 400)
 
-        self.settings = Settings(labslauncher.Defaults())
-        self.settings.override()
         app.aboutToQuit.connect(self.settings.qsettings.sync)
 
         self.pool = QThreadPool()
@@ -522,9 +532,11 @@ class LabsLauncher(QMainWindow):
         self.update.goto_start.connect(
             functools.partial(self.stack.setCurrentIndex, 1))
         self.show_home()
+        self.logger.info("Application started.")
 
     def closeEvent(self, event):
         """Emit closing signal on window close."""
+        self.logger.info("Quiting application.")
         self.closing.emit(True)
         super().closeEvent(event)
 
@@ -555,7 +567,8 @@ class LabsLauncher(QMainWindow):
         old, new = status
         if old == new:
             return
-        elif new == "running":
+        self.logger.info("Status changed: '{}'->'{}'".format(old, new))
+        if new == "running":
             if self.settings["send_pings"]:
                 self.ping('start')
                 callback = functools.partial(self.ping, 'update')
@@ -606,6 +619,7 @@ class LabsLauncher(QMainWindow):
             stats = self.docker.final_stats
         else:
             stats = self.docker.container.stats(stream=False)
+        self.logger.info("Sending ping data, state={}.".format(state))
         self.pinger.send_container_ping(
             state, stats, self.docker.image_name)
 
@@ -634,10 +648,37 @@ class About(QDialog):
 
 def main():
     """Entry point to run application."""
+    # parse args
+    settings = Settings(labslauncher.Defaults())
+    parser = argparse.ArgumentParser(
+        description="EPI2ME Labs Server Management.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        parents=[labslauncher.log_level(), settings.parser])
+    args = parser.parse_args()
+    settings.override(args)
+
+    # setup logging
+    logpath = os.path.expanduser(os.path.join('~', '.labslauncher'))
+    os.makedirs(logpath, exist_ok=True)
+    formatter = logging.Formatter(
+        '[%(asctime)s - %(name)s] %(message)s', datefmt='%H:%M:%S')
+    logger = logging.getLogger(__package__)
+    labslauncher.except_to_log(logger)
+    logger.setLevel(args.log_level)
+    filehandler = logging.handlers.RotatingFileHandler(
+        os.path.join(logpath, 'labslauncher.log'))
+    filehandler.setFormatter(formatter)
+    logger.addHandler(filehandler)
+    streamhandler = logging.StreamHandler()
+    streamhandler.setFormatter(formatter)
+    streamhandler.addFilter(labslauncher.uncaught_filter)
+    logger.addHandler(streamhandler)
+
+    # start gui
     app = QApplication(sys.argv)
     app_icon = QIcon()
     app_icon.addFile(resource_filename('labslauncher', 'epi2me.png'))
     app.setWindowIcon(app_icon)
-    launcher = LabsLauncher(app)
+    launcher = LabsLauncher(app, settings)
     launcher.show()
     sys.exit(app.exec_())
