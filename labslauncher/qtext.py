@@ -9,6 +9,8 @@ from PyQt5.QtCore import (
 from PyQt5.QtGui import QCursor
 from PyQt5.QtWidgets import QLabel
 
+import labslauncher
+
 
 class Property(QObject):
     """A variable which emits its value when changed.
@@ -97,6 +99,7 @@ class Worker(QRunnable):
         self.kwargs['progress'] = self.signals.progress
         self.stopped = threading.Event()
         self.kwargs['stopped'] = self.stopped
+        self.logger = labslauncher.get_named_logger('Runnabl')
 
     @Slot()
     def run(self):
@@ -104,7 +107,10 @@ class Worker(QRunnable):
         try:
             result = self.fn(*self.args, **self.kwargs)
         except Exception:
-            traceback.print_exc()
+            self.logger.exception(
+               "Failed to execute runnable:\nfn: {}\nargs: {}\nkwargs: {}"
+               .format(
+                   self.fn, self.args, self.kwargs))
             exctype, value = sys.exc_info()[:2]
             self.signals.error.emit((exctype, value, traceback.format_exc()))
         else:
@@ -166,6 +172,17 @@ class Settings():
             if not self.qsettings.contains(key):
                 self.qsettings.setValue(key, item["default"])
         self.overrides = None
+        self.parser = argparse.ArgumentParser(
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            add_help=False)
+        for item in self.spec:
+            key = item["key"]
+            arg_type = self.spec.get_type(key)
+            if arg_type == bool:  # just to help parsing
+                arg_type = int
+            self.parser.add_argument(
+                "--{}".format(key), type=arg_type,
+                help=self.spec.get_description(key))
 
     def __getitem__(self, key):
         """Get the value of a setting."""
@@ -182,18 +199,9 @@ class Settings():
         """Set the value of a setting."""
         self.qsettings.setValue(key, value)
 
-    def override(self):
+    def override(self, args):
         """Set command line overrides."""
-        self.parser = argparse.ArgumentParser()
-        for item in self.spec:
-            key = item["key"]
-            arg_type = self.spec.get_type(key)
-            if arg_type == bool:  # just to help parsing
-                arg_type = int
-            self.parser.add_argument(
-                "--{}".format(key), type=arg_type,
-                help=self.spec.get_description(key))
-        self.overrides = vars(self.parser.parse_args())
+        self.overrides = vars(args)
 
     def clear_override(self):
         """Clear command line overrides."""

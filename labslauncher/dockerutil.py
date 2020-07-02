@@ -8,9 +8,11 @@ import platform
 from cachetools import cached, TTLCache
 import docker
 from PyQt5.QtCore import QTimer
+from ratelimitingfilter import RateLimitingFilter
 import requests
 import semver
 
+import labslauncher
 from labslauncher import qtext
 
 
@@ -148,6 +150,23 @@ class DockerClient():
         self.container_cmd = container_cmd
         self.host_only = host_only
         self.fixed_tag = fixed_tag
+        self.logger = labslauncher.get_named_logger("DckrClnt")
+        # throttle connection errors to once every 5 minutes
+        spam = [
+            'Could not create docker client',
+            'Failed to query docker client']
+        self.logger.addFilter(
+            RateLimitingFilter(rate=1, per=300, burst=1, match=spam))
+        self.logger.info(
+           """Creating docker client with options:
+           image name: {}
+           server name: {}
+           data bind: {}
+           command: {}
+           host only: {}
+           fixed tag: {}""".format(
+               image_name, server_name, data_bind, container_cmd,
+               host_only, fixed_tag))
         self._client = None
         self.total_size = None
         self.final_stats = None
@@ -160,16 +179,22 @@ class DockerClient():
     @property
     def docker(self):
         """Return a connected docker client."""
+        old_client = self._client
         if self._client is None:
             try:
                 self._client = docker.client.DockerClient.from_env()
             except Exception:
+                self.logger.exception("Could not create docker client:")
                 pass
         try:
             self._client.version()
         except Exception:
+            self.logger.exception("Failed to query docker client:")
             self._client = None
             raise ConnectionError("Could not communicate with docker.")
+        else:
+            if old_client is None:
+                self.logger.info("Connection to docker (re)established.")
         return self._client
 
     def is_running(self):
@@ -256,6 +281,7 @@ class DockerClient():
         :returns: the image object.
 
         """
+        self.logging.info("Starting pull of image tag: {}.".format(tag))
         if tag is None:
             tag = self.latest_tag
         full_name = self.full_image_name(tag=tag)
@@ -271,6 +297,7 @@ class DockerClient():
         progress.emit(100.0)
         image = self.docker.images.get(full_name)
         self.tag.value = self.latest_available_tag
+        self.logging.info("Finished pulling image")
         return image
 
     @property
@@ -291,6 +318,7 @@ class DockerClient():
             the image is not available locally. To ensure more controlled
             behaviour check .fetch_local_image() first.
         """
+        self.logger.info("Starting container.")
         self.clear_container()
         CMD = self.container_cmd.split() + [
             "--NotebookApp.token={}".format(token),
@@ -315,6 +343,10 @@ class DockerClient():
                 name=self.server_name)
         except Exception as e:
             self.last_failure = str(e).replace("b'", "").replace("'\"", "\"")
+            self.logger.warning(
+                    "Failed to start container:\n{}".format(self.last_failure))
+        else:
+            self.logger.info("Container started.")
         self.final_stats = None
         self.set_status()
 
@@ -323,9 +355,13 @@ class DockerClient():
         cont = self.container
         if cont is not None:
             if cont.status == "running":
+                self.logger.info("Stopping container.")
                 self.final_stats = cont.stats(stream=False)
                 cont.kill()
+                self.logger.info("Container stopped.")
+            self.logger.info("Removing container.")
             cont.remove()
+            self.logger.info("Container removed.")
         self.set_status()
 
     def set_status(self, new=None):
