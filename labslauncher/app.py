@@ -316,9 +316,23 @@ class StartScreen(Screen):
             msg = QMessageBox(self)
             msg.setIcon(QMessageBox.Critical)
             msg.setText("Server start error")
-            msg.setInformativeText("An error occurred starting the server.")
             msg.setWindowTitle("Server Error")
-            msg.setDetailedText(self.app.docker.last_failure)
+            if self.app.docker.last_failure_type == "file_share":
+                msg.setInformativeText(
+                    "Cannot share data path with server. "
+                    "Please check sharing has been enabled in docker.")
+                msg.setDetailedText(
+                    "The path {} is not shared with Docker. You can "
+                    "configure shared paths from Docker > Settings "
+                    "> Resources > Filesharing. The path specified "
+                    "in Docker should either be the same as or "
+                    "contain the path you specify in this "
+                    "application.".format(mount))
+            else:
+                msg.setInformativeText(
+                    "An unexpected error occurred starting the server.")
+                msg.setDetailedText(self.app.docker.last_failure)
+                self.logger.error()
             msg.exec_()
         else:
             self.logger.info("Container started, writing config to mount.")
@@ -471,7 +485,6 @@ class LabsLauncher(QMainWindow):
         self.version = labslauncher.__version__
         self.about = About(self.version)
         self.logger = labslauncher.get_named_logger("Launcher")
-        self.logger.info("Starting application.")
 
         self.setWindowTitle("EPI2ME Labs Launcher")
         # display in centre of screen and fixed size
@@ -657,16 +670,20 @@ def main():
     args = parser.parse_args()
     settings.override(args)
 
+    # create gui
+    app = QApplication(sys.argv)
+    app_icon = QIcon()
+    app_icon.addFile(resource_filename('labslauncher', 'epi2me.png'))
+    app.setWindowIcon(app_icon)
+
     # setup logging
-    logpath = os.path.expanduser(os.path.join('~', '.labslauncher'))
-    os.makedirs(logpath, exist_ok=True)
+    os.makedirs(labslauncher.__LOGDIR__, exist_ok=True)
     formatter = logging.Formatter(
         '[%(asctime)s - %(name)s] %(message)s', datefmt='%H:%M:%S')
     logger = logging.getLogger(__package__)
-    labslauncher.except_to_log(logger)
     logger.setLevel(args.log_level)
     filehandler = logging.handlers.RotatingFileHandler(
-        os.path.join(logpath, 'labslauncher.log'))
+        os.path.join(labslauncher.__LOGDIR__, 'labslauncher.log'))
     filehandler.setFormatter(formatter)
     logger.addHandler(filehandler)
     streamhandler = logging.StreamHandler()
@@ -674,11 +691,11 @@ def main():
     streamhandler.addFilter(labslauncher.uncaught_filter)
     logger.addHandler(streamhandler)
 
+    # write unhandled exceptions to log, and force exit
+    labslauncher.handle_unhandled(logger)
+
     # start gui
-    app = QApplication(sys.argv)
-    app_icon = QIcon()
-    app_icon.addFile(resource_filename('labslauncher', 'epi2me.png'))
-    app.setWindowIcon(app_icon)
+    logger.info("Starting application.")
     launcher = LabsLauncher(app, settings)
     launcher.show()
     sys.exit(app.exec_())
