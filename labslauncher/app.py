@@ -18,8 +18,8 @@ from PyQt5.QtCore import (
     Qt, QT_VERSION_STR, QThreadPool, QTimer)
 from PyQt5.QtGui import QIcon, QIntValidator, QPixmap
 from PyQt5.QtWidgets import (
-    QAction, QApplication, QDesktopWidget, QDialog, QFileDialog, QGridLayout,
-    QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
+    QAction, QApplication, QCheckBox, QDesktopWidget, QDialog, QFileDialog,
+    QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
     QProgressBar, QPushButton, QStackedWidget, QVBoxLayout, QWidget)
 
 import labslauncher
@@ -483,8 +483,9 @@ class LabsLauncher(QMainWindow):
         super().__init__()
         self.settings = settings
         self.version = labslauncher.__version__
-        self.about = About(self.version)
         self.logger = labslauncher.get_named_logger("Launcher")
+        self.about = About(self.version)
+        self.settings_dlg = SettingsDlg(self.settings, parent=self)
 
         self.setWindowTitle("EPI2ME Labs Launcher")
         # display in centre of screen and fixed size
@@ -519,6 +520,9 @@ class LabsLauncher(QMainWindow):
         self.exit_act = QAction("Exit", self)
         self.exit_act.triggered.connect(self.close)
         self.file_menu.addAction(self.exit_act)
+        self.settings_act = QAction("Setting", self)
+        self.settings_act.triggered.connect(self.settings_dlg.show)
+        self.file_menu.addAction(self.settings_act)
         self.help_menu = self.menuBar().addMenu("&Help")
         self.about_act = QAction('About', self)
         self.about_act.triggered.connect(self.about.show)
@@ -657,6 +661,104 @@ class About(QDialog):
             "".format(version, PYQT_VERSION_STR, QT_VERSION_STR))
         self.layout.addWidget(self.label)
         self.setLayout(self.layout)
+
+
+class SettingsDlg(QDialog):
+    """About dialog."""
+
+    def __init__(self, settings, parent=None):
+        """Initialize the dialog.
+
+        :param version: application version string.
+        """
+        super().__init__(parent)
+        self.logger = self.parent().logger
+        self.settings = settings
+        self.setWindowTitle("Settings")
+        self.setFixedSize(600, 400)
+        self.layout = QVBoxLayout()
+
+        # Text boxes for setting values
+        self.val_boxes = dict()
+        self.l0 = QGridLayout()
+        for row, setting in enumerate(self._mutable_settings):
+            key = setting['key']
+            value = self.settings[key]
+            lab = QLabel(key)
+            wid = None
+            if setting['type'] is str:
+                wid = QLineEdit(text=value)
+                if key == 'registry':
+                    wid.setEnabled(False)
+            elif setting['type'] is bool:
+                wid = QCheckBox()
+                wid.setChecked(value)
+            else:
+                raise TypeError("Unhandled type in settings dialog.")
+            wid.setToolTip(setting['desc'])
+            self.val_boxes[key] = wid
+            self.l0.addWidget(lab, row, 0)
+            self.l0.addWidget(wid, row, 1)
+        self.layout.addLayout(self.l0)
+
+        # OK / Cancel
+        self.l1 = QHBoxLayout()
+        self.layout.insertStretch(-1)
+        self.set_btn = QPushButton("OK")
+        self.set_btn.clicked.connect(self.store_settings)
+        self.l1.addWidget(self.set_btn)
+        self.set_btn = QPushButton("Defaults")
+        self.set_btn.clicked.connect(self.set_defaults)
+        self.l1.addWidget(self.set_btn)
+        self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn.clicked.connect(self.close)
+        self.l1.addWidget(self.cancel_btn)
+        self.layout.addLayout(self.l1)
+
+        self.setLayout(self.layout)
+
+    @property
+    def _mutable_settings(self):
+        return (x for x in self.settings.spec if x['gui_menu'])
+
+    def store_settings(self):
+        """Save settings in edit fields to Qt settings manager."""
+        self.logger.info("Saving configuration.")
+        for key, wid in self.val_boxes.items():
+            value = None
+            if isinstance(wid, QLineEdit):
+                value = wid.text()
+            elif isinstance(wid, QCheckBox):
+                value = wid.isChecked()
+            else:
+                raise TypeError("Unhandled widget type when setting item.")
+            self.settings[key] = value
+        self.settings.qsettings.sync()
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setText("Restart Application")
+        msg.setInformativeText(
+            "Please restart the Launcher application for settings "
+            "to take effect.")
+        msg.setWindowTitle("Restart Notice")
+        msg.exec_()
+        self.close()
+
+    def set_defaults(self):
+        """Set edit fields to default values.
+
+        ..note:: This does not store the values to Qt.
+        """
+        self.logger.info("Preparing default configuration.")
+        for key, wid in self.val_boxes.items():
+            value = self.settings.spec.by_key[key]['default']
+            if isinstance(wid, QLineEdit):
+                wid.setText(value)
+            elif isinstance(wid, QCheckBox):
+                value = wid.setChecked(value)
+            else:
+                raise TypeError("Unhandled widget type when setting default.")
+            wid.repaint()
 
 
 def main():
