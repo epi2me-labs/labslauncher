@@ -98,7 +98,7 @@ class Defaults(list):
 
     def append(self, *values):
         """Append an item."""
-        keys = ("title", "desc", "key", "default")
+        keys = ("title", "desc", "key", "default", "gui_menu")
         data = dict(zip(keys, values))
         data["type"] = type(data["default"])
         data["section"] = self.section
@@ -110,37 +110,41 @@ class Defaults(list):
         self.section = "epi2melabs-notebook"
         self.by_key = dict()
         self.append(
+            "Registry",
+            "The container registry from which to download images.",
+            "registry", "docker.io", True)
+        self.append(
             "Image",
             "The container image to use from dockerhub.",
-            "image_name", "ontresearch/nanolabs-notebook")
+            "image_name", "ontresearch/nanolabs-notebook", True)
         self.append(
             "Fixed Tag",
             "Fix the container image to a specific tag.",
-            "fixed_tag", "")
+            "fixed_tag", "", True)
         self.append(
             "Server Name",
             "The name given to the actively running container.",
-            "server_name", "Epi2Me-Labs-Server")
+            "server_name", "Epi2Me-Labs-Server", True)
         self.append(
             "Data Mount",
             "Location on host computer accessible within notebooks.",
-            "data_mount", os.path.expanduser("~"))
+            "data_mount", os.path.expanduser("~"), False)
         self.append(
             "Data bind",
             "Location on server where host mount is accessible.",
-            "data_bind", "/epi2melabs/")
+            "data_bind", "/epi2melabs/", False)
         self.append(
             "Port",
             "Network port for communication between host and notebook server.",
-            "port", 8888)
+            "port", 8888, False)
         self.append(
             "Auxiliary Port",
             "Auxiliary network port for additional applications.",
-            "aux_port", 8889)
+            "aux_port", 8889, False)
         self.append(
             "Security Token",
             "Security token for notebook server.",
-            "token", "EPI2MELabs")
+            "token", "EPI2MELabs", False)
         self.append(
             "Container command.",
             "Command line arguments to run notebook server.",
@@ -150,28 +154,28 @@ class Defaults(list):
             " --NotebookApp.disable_check_xsrf=True"
             " --NotebookApp.port_retries=0"
             " --no-browser"
-            " --notebook-dir=/")
+            " --notebook-dir=/", False)
         self.append(
             "Colaboratory Homepage",
             "Link displayed for getting started.",
             "colab_link",
             "https://colab.research.google.com/github/epi2me-labs/"
-            "resources/blob/master/welcome.ipynb")
+            "resources/blob/master/welcome.ipynb", True)
         self.append(
             "Colaboratory help page",
             "Link to help page on Colaboratory.",
             "colab_help",
             "https://colab.research.google.com/github/epi2me-labs/"
-            "resources/blob/master/epi2me-labs-server.ipynb")
+            "resources/blob/master/epi2me-labs-server.ipynb", True)
         self.append(
             "Docker arguments",
             "Extra arguments to provide to `docker run`.",
-            "docker_args", "")
+            "docker_args", "", True)
         self.append(
             "Local access only",
             "Restrict access to notebook server to this computer only.",
-            "docker_restrict", True)
+            "docker_restrict", True, True)
         self.append(
             "Send pings",
             "Send usage statistics to ONT.",
-            "send_pings", True)
+            "send_pings", True, False)

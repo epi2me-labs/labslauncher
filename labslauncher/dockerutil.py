@@ -143,7 +143,7 @@ class DockerClient():
 
     def __init__(
             self, image_name, server_name, data_bind, container_cmd,
-            host_only, fixed_tag=None):
+            host_only, fixed_tag=None, registry='docker.io'):
         """Initialize the client."""
         self.image_name = image_name
         self.server_name = server_name
@@ -151,6 +151,8 @@ class DockerClient():
         self.container_cmd = container_cmd
         self.host_only = host_only
         self.fixed_tag = fixed_tag
+        self.registry = registry
+        # TODO: plumb in registry
         self.logger = labslauncher.get_named_logger("DckrClnt")
         # throttle connection errors to once every 5 minutes
         spam = [
