@@ -81,7 +81,7 @@ class HomeScreen(Screen):
 
         # welcome, version labels
         self.welcome_lbl = QLabel(
-            "Navigate to the <a href={}>Welcome page</a> "
+            "Navigate to the <a href='{}'>Welcome page</a> "
             "to get started.".format(self.app.settings["colab_link"]))
         self.welcome_lbl.setOpenExternalLinks(True)
         self.welcome_lbl.setAlignment(Qt.AlignCenter)
