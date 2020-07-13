@@ -14,13 +14,14 @@ VENV      = venv/bin/activate
 
 PYQT5SIP  = $(shell grep pyqt5-sip requirements.txt)
 PYWINTYPES=
-PYINSTALLERARGS=--onefile
+PYINSTALLERARGS=
 
 ifeq ($(shell uname), Darwin)
     MD5SUM = md5 -r
     SEDI   = sed -i ""
     PYINSTALLERARGS = ""
 endif
+# this is unused, see winbuild.ps1
 ifneq (,$(findstring MINGW64,$(shell uname)))
     VENV = venv/Scripts/activate
     PYWINTYPES = pypiwin32
@@ -64,9 +65,10 @@ clean:
 
 
 deb: clean dist/EPI2ME-Labs-Launcher
+	rm -rf deb-src/usr
 	mkdir -p deb-src/usr/local/bin
 	mkdir -p deb-src/usr/share/applications
-	cp dist/EPI2ME-Labs-Launcher deb-src/usr/local/bin/
+	cp -r dist/EPI2ME-Labs-Launcher deb-src/usr/local/bin/
 	cp labslauncher.desktop deb-src/usr/share/applications
 	cp labslauncher/epi2me.png deb-src/usr/share/applications/epi2me.png
 	cp -rp deb-src/ tmp/
