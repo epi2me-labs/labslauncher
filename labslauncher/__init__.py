@@ -109,7 +109,7 @@ class Defaults(list):
         """Initialize the class."""
         self.section = "epi2melabs-notebook"
         self.by_key = dict()
-        self.USE_COLAB = False
+        self.USE_COLAB = True
         self.append(
             "Registry",
             "The container registry from which to download images.",
