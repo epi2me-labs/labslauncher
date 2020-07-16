@@ -156,7 +156,7 @@ class Defaults(list):
             " --NotebookApp.port_retries=0"
             " --no-browser"
             " --notebook-dir=/", False)
-        item = [ 
+        item = [
             "Colaboratory Homepage",
             "Link displayed for getting started.",
             "colab_link",

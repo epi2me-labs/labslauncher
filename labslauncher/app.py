@@ -96,20 +96,26 @@ class HomeScreen(Screen):
         self.on_status(self.app.docker.status.value)
         self.on_tag(self.app.docker.tag.value)
 
+    @property
     def colab_link(self):
+        """Return the "colab" welcome link.
+
+        ..note:: This link may not refer to Google Colab.
+        """
         settings = self.app.settings
         link = settings['colab_link']
         if not settings.spec.USE_COLAB:
             link = link.format(
                 port=settings['port'],
-                databind=settings['data_bind'].replace('/',''),
+                databind=settings['data_bind'].replace('/', ''),
                 token=settings['token'])
         return link
 
     def set_welcome_lbl_text(self):
+        """Set Welcome hyperlink."""
         template = \
             "Navigate to the <a href='{}'>Welcome page</a> to get started."
-        self.welcome_lbl.setText(template.format(self.colab_link()))
+        self.welcome_lbl.setText(template.format(self.colab_link))
 
     def copy_address(self):
         """Copy server address to clipboard."""
@@ -282,14 +288,17 @@ class StartScreen(Screen):
             self.app.settings["data_mount"] = path
 
     def token_change(self):
+        """Set state when user changes token."""
         self.app.settings["token"] = self.token_txt.text()
         self.app.home.set_welcome_lbl_text()
 
     def port_change(self):
+        """Set state when user changes port."""
         self.app.settings["port"] = self.port_txt.text()
         self.app.home.set_welcome_lbl_text()
 
     def aux_port_change(self):
+        """Set state when user changes auxilary port."""
         self.app.settings["aux_port"] = self.aux_port_txt.text()
         self.app.home.set_welcome_lbl_text()
 
@@ -593,7 +602,7 @@ class LabsLauncher(QMainWindow):
         if not self.settings.spec.USE_COLAB:
             link.format(
                 port=self.settings['port'],
-                databind=self.settings['data_bind'].replace('/',''),
+                databind=self.settings['data_bind'].replace('/', ''),
                 token=self.settings['token'])
         webbrowser.open(link)
 
