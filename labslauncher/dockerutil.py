@@ -284,7 +284,7 @@ class DockerClient():
         :returns: the image object.
 
         """
-        self.logging.info("Starting pull of image tag: {}.".format(tag))
+        self.logger.info("Starting pull of image tag: {}.".format(tag))
         if tag is None:
             tag = self.latest_tag
         full_name = self.full_image_name(tag=tag)
@@ -300,7 +300,7 @@ class DockerClient():
         progress.emit(100.0)
         image = self.docker.images.get(full_name)
         self.tag.value = self.latest_available_tag
-        self.logging.info("Finished pulling image")
+        self.logger.info("Finished pulling image")
         return image
 
     @property
