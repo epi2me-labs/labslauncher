@@ -109,6 +109,7 @@ class Defaults(list):
         """Initialize the class."""
         self.section = "epi2melabs-notebook"
         self.by_key = dict()
+        self.USE_COLAB = True
         self.append(
             "Registry",
             "The container registry from which to download images.",
@@ -155,18 +156,30 @@ class Defaults(list):
             " --NotebookApp.port_retries=0"
             " --no-browser"
             " --notebook-dir=/", False)
-        self.append(
+        item = [
             "Colaboratory Homepage",
             "Link displayed for getting started.",
             "colab_link",
             "https://colab.research.google.com/github/epi2me-labs/"
-            "resources/blob/master/welcome.ipynb", True)
-        self.append(
+            "resources/blob/master/welcome.ipynb", True]
+        if not self.USE_COLAB:
+            item[3] = \
+                "http://localhost:{port}/lab/tree/epi2me-resources/" \
+                + "resources/welcome.ipynb" \
+                + "?file-browser-path=/{databind}&token={token}"
+        self.append(*item)
+        item = [
             "Colaboratory help page",
             "Link to help page on Colaboratory.",
             "colab_help",
             "https://colab.research.google.com/github/epi2me-labs/"
-            "resources/blob/master/epi2me-labs-server.ipynb", True)
+            "resources/blob/master/epi2me-labs-server.ipynb", True]
+        if not self.USE_COLAB:
+            item[3] = \
+                "http://localhost:{port}/lab/tree/epi2me-resources/" \
+                + "resources/epi2me-labs-server.ipynb?" \
+                + "file-browser-path=/{databind}&token={token}"
+        self.append(*item)
         self.append(
             "Docker arguments",
             "Extra arguments to provide to `docker run`.",

@@ -80,9 +80,8 @@ class HomeScreen(Screen):
         self.layout.addStretch(-1)
 
         # welcome, version labels
-        self.welcome_lbl = QLabel(
-            "Navigate to the <a href='{}'>Welcome page</a> "
-            "to get started.".format(self.app.settings["colab_link"]))
+        self.welcome_lbl = QLabel()
+        self.set_welcome_lbl_text()
         self.welcome_lbl.setOpenExternalLinks(True)
         self.welcome_lbl.setAlignment(Qt.AlignCenter)
         self.version_lbl = QLabel()
@@ -96,6 +95,27 @@ class HomeScreen(Screen):
         self.app.docker.tag.changed.connect(self.on_tag)
         self.on_status(self.app.docker.status.value)
         self.on_tag(self.app.docker.tag.value)
+
+    @property
+    def colab_link(self):
+        """Return the "colab" welcome link.
+
+        ..note:: This link may not refer to Google Colab.
+        """
+        settings = self.app.settings
+        link = settings['colab_link']
+        if not settings.spec.USE_COLAB:
+            link = link.format(
+                port=settings['port'],
+                databind=settings['data_bind'].replace('/', ''),
+                token=settings['token'])
+        return link
+
+    def set_welcome_lbl_text(self):
+        """Set Welcome hyperlink."""
+        template = \
+            "Navigate to the <a href='{}'>Welcome page</a> to get started."
+        self.welcome_lbl.setText(template.format(self.colab_link))
 
     def copy_address(self):
         """Copy server address to clipboard."""
@@ -213,14 +233,17 @@ class StartScreen(Screen):
 
         self.token_lbl = QLabel('Token:')
         self.token_txt = QLineEdit(text=self.app.settings['token'])
+        self.token_txt.textChanged.connect(self.token_change)
         self.token_txt.setMaxLength(16)
         self.token_txt.setToolTip(self.token_help)
         self.port_lbl = QLabel('Port:')
         self.port_txt = QLineEdit(text=str(self.app.settings['port']))
+        self.port_txt.textChanged.connect(self.port_change)
         self.port_txt.setValidator(self.onlyInt)
         self.port_txt.setToolTip(self.port_help)
         self.aux_port_lbl = QLabel('Aux. Port:')
         self.aux_port_txt = QLineEdit(text=str(self.app.settings['aux_port']))
+        self.aux_port_txt.textChanged.connect(self.aux_port_change)
         self.aux_port_txt.setValidator(self.onlyInt)
         self.aux_port_txt.setToolTip(self.aux_port_help)
 
@@ -264,12 +287,27 @@ class StartScreen(Screen):
             self.path_txt.setText(path)
             self.app.settings["data_mount"] = path
 
+    def token_change(self):
+        """Set state when user changes token."""
+        self.app.settings["token"] = self.token_txt.text()
+        self.app.home.set_welcome_lbl_text()
+
+    def port_change(self):
+        """Set state when user changes port."""
+        self.app.settings["port"] = self.port_txt.text()
+        self.app.home.set_welcome_lbl_text()
+
+    def aux_port_change(self):
+        """Set state when user changes auxilary port."""
+        self.app.settings["aux_port"] = self.aux_port_txt.text()
+        self.app.home.set_welcome_lbl_text()
+
     def validate_and_start(self):
         """Start the container."""
-        mount = self.path_txt.text()
-        token = self.token_txt.text()
-        port = self.port_txt.text()
-        aux_port = self.aux_port_txt.text()
+        mount = self.app.settings["data_mount"]
+        token = self.app.settings["token"]
+        port = self.app.settings["port"]
+        aux_port = self.app.settings["aux_port"]
         # validate inputs
         valid = all([
             mount != "",
@@ -280,7 +318,8 @@ class StartScreen(Screen):
             port != aux_port])
 
         if valid:
-            if self.app.docker.latest_available_tag is None:
+            if (self.app.docker.latest_available_tag is None or
+                    self.app.settings["fixed_tag"] == "dev"):
                 self.pull_image(callback=self._start_container)
             else:
                 self._start_container()
@@ -301,10 +340,10 @@ class StartScreen(Screen):
 
     def _start_container(self):
         """Start container."""
-        mount = self.path_txt.text()
-        token = self.token_txt.text()
-        port = self.port_txt.text()
-        aux_port = self.aux_port_txt.text()
+        mount = self.app.settings["data_mount"]
+        token = self.app.settings["token"]
+        port = self.app.settings["port"]
+        aux_port = self.app.settings["aux_port"]
 
         for btn in (self.start_btn, self.update_btn):
             btn.setEnabled(False)
@@ -559,7 +598,13 @@ class LabsLauncher(QMainWindow):
 
     def show_help(self):
         """Open webbrowser with application help."""
-        webbrowser.open(self.settings['colab_help'])
+        link = self.settings['colab_help']
+        if not self.settings.spec.USE_COLAB:
+            link.format(
+                port=self.settings['port'],
+                databind=self.settings['data_bind'].replace('/', ''),
+                token=self.settings['token'])
+        webbrowser.open(link)
 
     def show_home(self):
         """Move to the home screen."""
