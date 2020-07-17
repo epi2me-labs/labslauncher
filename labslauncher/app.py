@@ -447,7 +447,7 @@ class UpdateScreen(Screen):
     update_text = (
         "<b>Update available</b><br>"
         "An update to the notebook server is available. Updating the "
-        "notebook server will allowed continued use to the most recent "
+        "notebook server will allow continued use of the most recent "
         "EPI2ME Labs notebooks on GitHub. Please press the Update "
         "button on the main screen to update.<br><br>"
         "Current version: {}.<br>"
