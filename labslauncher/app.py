@@ -371,7 +371,7 @@ class StartScreen(Screen):
                 msg.setInformativeText(
                     "An unexpected error occurred starting the server.")
                 msg.setDetailedText(self.app.docker.last_failure)
-                self.logger.error()
+                self.logger.error(self.app.docker.last_failure)
             msg.exec_()
         else:
             self.logger.info("Container started, writing config to mount.")
