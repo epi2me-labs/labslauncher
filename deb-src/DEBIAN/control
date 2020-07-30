@@ -5,5 +5,6 @@ Priority: optional
 Architecture: amd64
 Source: PROJECT
 Depends: 
+Conflicts: CONFLICTPROJECT
 Maintainer: Oxford Nanopore Technologies
 Description: EPI2ME-Labs Server Manager

@@ -1,5 +1,13 @@
 # CI sets MAJOR.MINOR.PATCH for git tags
-PROJECT  ?= ont-epi2melabs-launcher
+NOCOLAB  ?= 0
+DEBNAME  ?= ont-epi2melabs-launcher
+ifeq ($(NOCOLAB), 0)
+	PROJECT = $(DEBNAME)
+	CONFLICTPROJECT = $(DEBNAME)-jupyter
+else
+	PROJECT = $(DEBNAME)-jupyter
+	CONFLICTPROJECT = $(DEBNAME)
+endif
 MAJOR    ?= 0
 MINOR    ?= 0
 SUB      ?= 0
@@ -14,13 +22,15 @@ VENV      = venv/bin/activate
 
 PYQT5SIP  = $(shell grep pyqt5-sip requirements.txt)
 PYWINTYPES=
-PYINSTALLERARGS=--onefile
+PYINSTALLERARGS=
+
 
 ifeq ($(shell uname), Darwin)
     MD5SUM = md5 -r
     SEDI   = sed -i ""
     PYINSTALLERARGS = ""
 endif
+# this is unused, see winbuild.ps1
 ifneq (,$(findstring MINGW64,$(shell uname)))
     VENV = venv/Scripts/activate
     PYWINTYPES = pypiwin32
@@ -29,7 +39,10 @@ IN_VENV=. ./$(VENV)
 
 
 $(VENV):
-	echo "'"$(shell uname)"'"
+	@echo Project: $(PROJECT)
+	@echo Conflicts project: $(CONFLICTPROJECT)
+	@echo Shell: "'"$(shell uname)"'"
+	@echo
 	test -d venv || virtualenv venv --python=$(PYTHON) --prompt "(build) "
 	${IN_VENV} && pip install pip --upgrade
 	${IN_VENV} && pip install ${PYQT5SIP} ${PYWINTYPES}
@@ -64,12 +77,16 @@ clean:
 
 
 deb: clean dist/EPI2ME-Labs-Launcher
+	echo $(PROJECT)
+	echo $(CONFLICTPROJECT)
+	rm -rf deb-src/usr
 	mkdir -p deb-src/usr/local/bin
 	mkdir -p deb-src/usr/share/applications
-	cp dist/EPI2ME-Labs-Launcher deb-src/usr/local/bin/
+	cp -r dist/EPI2ME-Labs-Launcher deb-src/usr/local/bin/
 	cp labslauncher.desktop deb-src/usr/share/applications
 	cp labslauncher/epi2me.png deb-src/usr/share/applications/epi2me.png
 	cp -rp deb-src/ tmp/
+	$(SEDI) "s/CONFLICTPROJECT/$(CONFLICTPROJECT)/g"   tmp/DEBIAN/control
 	$(SEDI) "s/PROJECT/$(PROJECT)/g"   tmp/DEBIAN/control
 	$(SEDI) "s/MAJOR/$(MAJOR)/g"       tmp/DEBIAN/control
 	$(SEDI) "s/MINOR/$(MINOR)/g"       tmp/DEBIAN/control

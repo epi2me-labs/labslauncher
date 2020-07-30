@@ -5,6 +5,7 @@ password_strength==0.0.3.post2
 PyInstaller==3.6
 pyqt5==5.14.2
 pyqt5-sip==12.7.2
+ratelimitingfilter==1.2
 requests==2.20.0
 semver==2.9.1
 setuptools < 45

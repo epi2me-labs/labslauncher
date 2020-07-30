@@ -2,7 +2,7 @@
 Version=1.0
 Name=EPI2ME-Labs Server Control
 Comment=Start, stop, and upgrade the EPI2ME Labs server
-Exec=/usr/local/bin/EPI2ME-Labs-Launcher
+Exec=/usr/local/bin/EPI2ME-Labs-Launcher/EPI2ME-Labs-Launcher
 Icon=/usr/share/applications/epi2me.png
 Type=Application
 Categories=Utility;Application

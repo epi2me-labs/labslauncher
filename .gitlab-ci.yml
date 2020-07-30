@@ -16,17 +16,41 @@ test:
     script:
         - PYTHON=python3 make test
 
-build-win:
+###
+# Windows
+#
+.build-win: &build-win
     stage: build
     tags:
         - epi2melabs-win
+
+build-win-colab:
+    <<: *build-win
+    variables:
+        NOCOLAB: 0
     script:
         - .\winbuild.ps1
+        - Move-Item dist/epi2melabs-installer.exe ont-epi2melabs-installer.exe
     artifacts:
         paths:
-            - "dist/epi2melabs-installer.exe"
+            - "ont-epi2melabs-installer.exe"
 
-.build: &build
+build-win-nocolab:
+    <<: *build-win
+    variables:
+        NOCOLAB: 1
+    script:
+        - .\winbuild.ps1
+        - Move-Item dist/epi2melabs-installer.exe ont-epi2melabs-jupyter-installer.exe
+    artifacts:
+        paths:
+            - "ont-epi2melabs-jupyter-installer.exe"
+
+
+###
+# Ubuntu
+#
+.build-ubuntu: &build-ubuntu
     image: ${IMAGEUSED}
     stage: build
     tags:
@@ -42,22 +66,6 @@ build-win:
             - "ont-epi2melabs-launcher*.deb"
     except:
         - tags
-
-.xenial: &xenial
-    <<: *build
-    variables:
-        IMAGEUSED: ${IMAGE}:16.04
-    
-.bionic: &bionic
-    <<: *build
-    variables:
-        IMAGEUSED: ${IMAGE}:18.04
-        
-xenial-deb:
-    <<: *xenial
-        
-bionic-deb:
-    <<: *bionic
 
 .setup-tag: &tag
     before_script:
@@ -76,14 +84,69 @@ bionic-deb:
     except:
         - branches
 
-xenial-amd64-tag:
-    <<: *xenial
+.xenial-colab: &xenial-colab
+    <<: *build-ubuntu
+    variables:
+        IMAGEUSED: ${IMAGE}:16.04
+        NOCOLAB: 0
+
+.xenial-nocolab: &xenial-nocolab
+    <<: *build-ubuntu
+    variables:
+        IMAGEUSED: ${IMAGE}:16.04
+        NOCOLAB: 1
+        
+.bionic-colab: &bionic-colab
+    <<: *build-ubuntu
+    variables:
+        IMAGEUSED: ${IMAGE}:18.04
+        NOCOLAB: 0
+
+.bionic-nocolab: &bionic-nocolab
+    <<: *build-ubuntu
+    variables:
+        IMAGEUSED: ${IMAGE}:18.04
+        NOCOLAB: 1
+
+# branches
+xenial-deb-colab:
+    <<: *xenial-colab
+xenial-deb-nocolab:
+    <<: *xenial-nocolab
+bionic-deb-colab:
+    <<: *bionic-colab
+bionic-deb-nocolab:
+    <<: *bionic-nocolab
+
+# tags
+xenial-tag-colab:
+    <<: *xenial-colab
+    <<: *tag
+xenial-tag-nocolab:
+    <<: *xenial-nocolab
+    <<: *tag
+bionic-tag-colab:
+    <<: *bionic-colab
+    <<: *tag
+bionic-tag-nocolab:
+    <<: *bionic-nocolab
     <<: *tag
 
-bionic-amd64-tag:
-    <<: *bionic
-    <<: *tag
 
+###
+# Push
+#
+
+bundle:
+    stage: publish
+    script:
+        - echo "Just gathering artifacts in one place"
+    artifacts:
+        paths:
+            - "ont-epi2melabs*installer.exe"
+            - "ont-epi2melabs-launcher*.deb"
+    
+    
 .setup-deb-push: &setup-deb-push
     image: ${IMAGE}:16.04
     before_script:
@@ -97,6 +160,8 @@ push-debs:
         - for CODENAME in xenial bionic; do scp -o StrictHostKeyChecking=no *${CODENAME}.deb ${DEBREPO}:/var/www/apt/${CODENAME}-stable; done
     only:
         - /^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$/
+    except:
+        - branches
 
 push-external:
     <<: *setup-deb-push
@@ -104,8 +169,14 @@ push-external:
     script:
         - for CODENAME in xenial bionic; do scp -o StrictHostKeyChecking=no *${CODENAME}.deb ${EXTERNALDEBREPO}:/mirror/apt/incoming/${CODENAME}-stable; done
     dependencies:
-        - xenial-amd64-tag
-        - bionic-amd64-tag
+        - xenial-tag-colab
+        - xenial-tag-nocolab
+        - bionic-tag-colab
+        - bionic-tag-nocolab
     only:
         - /^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$/
+    except:
+        - branches
     when: manual
+
+
