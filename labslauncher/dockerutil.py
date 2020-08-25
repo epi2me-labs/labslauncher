@@ -326,6 +326,11 @@ class DockerClient():
         CMD = self.container_cmd.split() + [
             "--NotebookApp.token={}".format(token),
             "--port={}".format(port)]
+        if platform.system() == "Linux":
+            uid = os.geteuid()
+            self.logger.info(
+                "Running notebook command as user {}.".format(uid))
+            CMD = ['run_as_user.sh', str(uid)] + CMD
 
         try:
             # note: colab requires the port in the container to be equal
