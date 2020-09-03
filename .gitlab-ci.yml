@@ -30,22 +30,29 @@ build-win-colab:
         NOCOLAB: 0
     script:
         - .\winbuild.ps1
-        - Move-Item dist/epi2melabs-installer.exe ont-epi2melabs-installer.exe
+        - Move-Item dist/epi2melabs-installer.exe "ont-epi2melabs-installer-${CI_COMMIT_REF_NAME}-win10.exe"
     artifacts:
         paths:
-            - "ont-epi2melabs-installer.exe"
+            - "ont-epi2melabs-installer-$CI_COMMIT_REF_NAME-win10.exe"
 
-build-win-nocolab:
-    <<: *build-win
+###
+# macos
+# #
+.build-macos: &build-macos
+    stage: build
+    tags:
+        - epi2melabs-macos
+
+build-macos-colab:
+    <<: *build-macos
     variables:
-        NOCOLAB: 1
+        NOCOLAB: 0
     script:
-        - .\winbuild.ps1
-        - Move-Item dist/epi2melabs-installer.exe ont-epi2melabs-jupyter-installer.exe
+        - PYTHON=python3 make build
+        - cd dist; zip -r ../ont-epi2melabs-launcher-${CI_COMMIT_REF_NAME}-macos.app.zip EPI2ME-Labs-Launcher.app
     artifacts:
         paths:
-            - "ont-epi2melabs-jupyter-installer.exe"
-
+            - "ont-epi2melabs-launcher-${CI_COMMIT_REF_NAME}-macos.app.zip"
 
 ###
 # Ubuntu
@@ -90,46 +97,24 @@ build-win-nocolab:
         IMAGEUSED: ${IMAGE}:16.04
         NOCOLAB: 0
 
-.xenial-nocolab: &xenial-nocolab
-    <<: *build-ubuntu
-    variables:
-        IMAGEUSED: ${IMAGE}:16.04
-        NOCOLAB: 1
-        
 .bionic-colab: &bionic-colab
     <<: *build-ubuntu
     variables:
         IMAGEUSED: ${IMAGE}:18.04
         NOCOLAB: 0
 
-.bionic-nocolab: &bionic-nocolab
-    <<: *build-ubuntu
-    variables:
-        IMAGEUSED: ${IMAGE}:18.04
-        NOCOLAB: 1
-
 # branches
 xenial-deb-colab:
     <<: *xenial-colab
-xenial-deb-nocolab:
-    <<: *xenial-nocolab
 bionic-deb-colab:
     <<: *bionic-colab
-bionic-deb-nocolab:
-    <<: *bionic-nocolab
 
 # tags
 xenial-tag-colab:
     <<: *xenial-colab
     <<: *tag
-xenial-tag-nocolab:
-    <<: *xenial-nocolab
-    <<: *tag
 bionic-tag-colab:
     <<: *bionic-colab
-    <<: *tag
-bionic-tag-nocolab:
-    <<: *bionic-nocolab
     <<: *tag
 
 
@@ -143,8 +128,9 @@ bundle:
         - echo "Just gathering artifacts in one place"
     artifacts:
         paths:
-            - "ont-epi2melabs*installer.exe"
-            - "ont-epi2melabs-launcher*.deb"
+            - "ont-epi2melabs-installer-*-win10.exe"
+            - "ont-epi2melabs-launcher-*.deb"
+            - "ont-epi2melabs-launcher-*-macos.app.zip"
     
     
 .setup-deb-push: &setup-deb-push
@@ -170,9 +156,7 @@ push-external:
         - for CODENAME in xenial bionic; do scp -o StrictHostKeyChecking=no *${CODENAME}.deb ${EXTERNALDEBREPO}:/mirror/apt/incoming/${CODENAME}-stable; done
     dependencies:
         - xenial-tag-colab
-        - xenial-tag-nocolab
         - bionic-tag-colab
-        - bionic-tag-nocolab
     only:
         - /^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$/
     except:

@@ -22,7 +22,7 @@ To build and run the application:
 ```bash
 git clone https://github.com/epi2me-labs/labslauncher.git
 cd labslauncher
-make run
+PYTHON=python3 make run
 ```
 
 This will:
@@ -42,5 +42,9 @@ image are not forced, the newest image locally available will be used.
 A hidden feature is the ability to use an arbitrary image tag for development
 purposes, to do this run:
 
-    labslauncher --fixed_tag latest
+    labslauncher --fixed_tag latest --send_pings 0
+    
+The `--send_pings 0` stops both the launcher and notebooks from sending pings
+(the launcher writes a piece of config in the notebook container to disable
+pings).
 

@@ -1,6 +1,7 @@
 """Labslauncher main application."""
 import argparse
 import configparser
+from enum import Enum
 import functools
 import logging
 import logging.handlers
@@ -18,9 +19,10 @@ from PyQt5.QtCore import (
     Qt, QT_VERSION_STR, QThreadPool, QTimer)
 from PyQt5.QtGui import QIcon, QIntValidator, QPixmap
 from PyQt5.QtWidgets import (
-    QAction, QApplication, QCheckBox, QDesktopWidget, QDialog, QFileDialog,
-    QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
-    QProgressBar, QPushButton, QStackedWidget, QVBoxLayout, QWidget)
+    QAction, QApplication, QCheckBox, QComboBox, QDesktopWidget, QDialog,
+    QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
+    QMessageBox, QProgressBar, QPushButton, QStackedWidget, QVBoxLayout,
+    QWidget)
 
 import labslauncher
 from labslauncher.dockerutil import DockerClient
@@ -103,12 +105,9 @@ class HomeScreen(Screen):
         ..note:: This link may not refer to Google Colab.
         """
         settings = self.app.settings
-        link = settings['colab_link']
-        if not settings.spec.USE_COLAB:
-            link = link.format(
-                port=settings['port'],
-                databind=settings['data_bind'].replace('/', ''),
-                token=settings['token'])
+        link = labslauncher.get_colab_link(
+            settings['notebook_flavour'], settings['port'],
+            settings['data_bind'].replace('/', ''), settings['token'])
         return link
 
     def set_welcome_lbl_text(self):
@@ -598,12 +597,10 @@ class LabsLauncher(QMainWindow):
 
     def show_help(self):
         """Open webbrowser with application help."""
-        link = self.settings['colab_help']
-        if not self.settings.spec.USE_COLAB:
-            link.format(
-                port=self.settings['port'],
-                databind=self.settings['data_bind'].replace('/', ''),
-                token=self.settings['token'])
+        settings = self.settings
+        link = labslauncher.get_colab_help(
+            settings['notebook_flavour'], settings['port'],
+            settings['data_bind'].replace('/', ''), settings['token'])
         webbrowser.open(link)
 
     def show_home(self):
@@ -738,6 +735,11 @@ class SettingsDlg(QDialog):
             elif setting['type'] is bool:
                 wid = QCheckBox()
                 wid.setChecked(value)
+            elif issubclass(setting['type'], Enum):
+                wid = QComboBox()
+                for flavour in setting['type']:
+                    wid.addItem(flavour.name, flavour.value)
+                wid.setCurrentText(value.name)
             else:
                 raise TypeError("Unhandled type in settings dialog.")
             wid.setToolTip(setting['desc'])
@@ -775,6 +777,8 @@ class SettingsDlg(QDialog):
                 value = wid.text()
             elif isinstance(wid, QCheckBox):
                 value = wid.isChecked()
+            elif isinstance(wid, QComboBox):
+                value = wid.currentData()
             else:
                 raise TypeError("Unhandled widget type when setting item.")
             self.settings[key] = value
@@ -800,7 +804,9 @@ class SettingsDlg(QDialog):
             if isinstance(wid, QLineEdit):
                 wid.setText(value)
             elif isinstance(wid, QCheckBox):
-                value = wid.setChecked(value)
+                wid.setChecked(value)
+            elif isinstance(wid, QComboBox):
+                wid.setCurrentText(value.name)
             else:
                 raise TypeError("Unhandled widget type when setting default.")
             wid.repaint()

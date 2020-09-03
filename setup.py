@@ -40,8 +40,9 @@ with fileinput.input(
         files=[os.path.join(__pkg_name__, '__init__.py')],
         inplace=True, backup='.bck') as fh:
     for line in fh:
-        if "USE_COLAB = " in line:
-            line = re.sub(r" = .*$", " = {}".format(use_colab), line)
+        if '"notebook_flavour", NotebookFlavour' in line:
+            flavour = ["JUPYTER", "COLAB"][use_colab]
+            line = re.sub(r"Flavour\..*\,", "Flavour.{},".format(flavour), line)
         print(line, end="")
 
 dir_path = os.path.dirname(__file__)

@@ -155,6 +155,9 @@ class ClickLabel(QLabel):
             self.setCursor(QCursor(Qt.ArrowCursor))
 
 
+AppQSettings = QSettings("EPIME Labs", "Launcher")
+
+
 class Settings():
     """Wrapper around QSettings to provide defaults."""
 
@@ -164,14 +167,21 @@ class Settings():
         :param specification: an item like `labslauncher.Settings`.
 
         """
-        self.qsettings = QSettings("EPIME Labs", "Launcher")
+        self.qsettings = AppQSettings
         self.spec = specification
+        self.overrides = None
 
+        # add defaults options to Qsettings, maybe reset
+        reset = False
+        prev_version = self.qsettings.value("version", None)
+        if prev_version is None or prev_version != self.spec['version']:
+            reset = True
         for item in self.spec:
             key = item["key"]
-            if not self.qsettings.contains(key):
+            if reset or not self.qsettings.contains(key):
                 self.qsettings.setValue(key, item["default"])
-        self.overrides = None
+
+        # setup a cmdline parser acoording to our options
         self.parser = argparse.ArgumentParser(
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             add_help=False)
