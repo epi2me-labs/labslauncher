@@ -46,6 +46,24 @@ build-win-nocolab:
         paths:
             - "ont-epi2melabs-jupyter-installer.exe"
 
+###
+# macos
+# #
+.build-macos: &build-macos
+    stage: build
+    tags:
+        - epi2melabs-macos
+
+build-macos-colab:
+    <<: *build-macos
+    variables:
+        NOCOLAB: 0
+    script:
+        - PYTHON=python3 make build
+        - cd dist; zip -r ../ont-epi2melabs-launcher-${CI_COMMIT_REF_NAME}-macos.app.zip EPI2ME-Labs-Launcher.app
+    artifacts:
+        paths:
+            - "ont-epi2melabs-launcher-${CI_COMMIT_REF_NAME}-macos.app.zip"
 
 ###
 # Ubuntu
@@ -145,6 +163,7 @@ bundle:
         paths:
             - "ont-epi2melabs*installer.exe"
             - "ont-epi2melabs-launcher*.deb"
+            - "ont-epi2melabs-launcher-*-macos.app.zip"
     
     
 .setup-deb-push: &setup-deb-push
