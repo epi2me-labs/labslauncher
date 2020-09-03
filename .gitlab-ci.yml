@@ -33,7 +33,7 @@ build-win-colab:
         - Move-Item dist/epi2melabs-installer.exe "ont-epi2melabs-installer-${CI_COMMIT_REF_NAME}-win10.exe"
     artifacts:
         paths:
-            - "ont-epi2melabs-installer-$CI_COMMIT_REF_NAME.exe"
+            - "ont-epi2melabs-installer-$CI_COMMIT_REF_NAME-win10.exe"
 
 ###
 # macos
@@ -128,8 +128,8 @@ bundle:
         - echo "Just gathering artifacts in one place"
     artifacts:
         paths:
-            - "ont-epi2melabs-installer-*.exe"
-            - "ont-epi2melabs-launcher*.deb"
+            - "ont-epi2melabs-installer-*-win10.exe"
+            - "ont-epi2melabs-launcher-*.deb"
             - "ont-epi2melabs-launcher-*-macos.app.zip"
     
     
