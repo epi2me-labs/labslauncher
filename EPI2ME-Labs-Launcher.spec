@@ -82,4 +82,7 @@ else:
             exe,
             name='{}.app'.format(name),
             icon=os.path.join('labslauncher', 'epi2me.icns'),
-            bundle_identifier=None)
+            bundle_identifier=None,
+            info_plist={
+                'NSPrincipalClass': 'NSApplication',
+                'NSHighResolutionCapable': 'True'})
