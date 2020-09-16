@@ -12,10 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
  - Application crash when remote services unavailable.
  - Ability to switch between Colab and JupyterLab flavours.
-## Changed
+### Changed
  - Reset application settings on install.
  - Run container as host user on Linux (ensures correct file permissions).
-## Removed
+### Removed
  - Unite Colab and JupyterLab application flavours.
 
 ## [0.6.0] - 2020-07-30
@@ -39,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Add extra aux port.
 
 ## [0.4.2] - 2020-05-11
-###Fixed
+### Fixed
  - New tag due to corrupted CI push.
 
 ## [0.4.1] - 2020-05-11
