@@ -41,14 +41,15 @@ build-win-colab:
 .build-macos: &build-macos
     stage: build
     tags:
-        - epi2melabs-macos
+        - macos
+        - oxford
 
 build-macos-colab:
     <<: *build-macos
     variables:
         NOCOLAB: 0
     script:
-        - PYTHON=python3 make build
+        - PYTHON=$(PYENV_VERSION=3.6.11 pyenv which python) make build
         - cd dist; zip -r ../ont-epi2melabs-launcher-${CI_COMMIT_REF_NAME}-macos.app.zip EPI2ME-Labs-Launcher.app
     artifacts:
         paths:
