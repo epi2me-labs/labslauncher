@@ -11,7 +11,7 @@ from PyQt5 import sip  # noqa: F401
 from PyQt5.QtWidgets import QMessageBox
 
 
-__version__ = "0.6.1"
+__version__ = "0.6.2"
 __UNCAUGHT__ = "Uncaught exception:"
 __LOGDIR__ = os.path.expanduser(os.path.join('~', '.labslauncher'))
 
@@ -170,7 +170,7 @@ class Defaults(list):
         self.append(
             "Notebook Flavour",
             "The application flavour (JupyterLab or Colab).",
-            "notebook_flavour", NotebookFlavour.COLAB, True)
+            "notebook_flavour", NotebookFlavour.JUPYTERLAB, True)
         self.append(
             "Registry",
             "The container registry from which to download images.",
