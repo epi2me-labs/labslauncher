@@ -4,11 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.3]
+### Removed
+ - Ability to change app behaviour for Colab
+### Changed
+ - Help links now point to EPI2MELabs blog site
+
 ## [0.6.2]
 ### Fixed
-- Font rendering on high resolution displays on macOS.
+ - Font rendering on high resolution displays on macOS.
 ### Changed
-- Default application flavour is now Jupyterab.
+ - Default application flavour is now Jupyterab.
 
 ## [0.6.1] - 2020-09-03
 ### Fixed
