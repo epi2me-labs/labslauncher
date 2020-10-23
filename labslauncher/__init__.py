@@ -1,6 +1,5 @@
 """Application for managing a notebook server."""
 import argparse
-from enum import Enum
 import functools
 import logging
 import os
@@ -11,62 +10,26 @@ from PyQt5 import sip  # noqa: F401
 from PyQt5.QtWidgets import QMessageBox
 
 
-__version__ = "0.6.1"
+__version__ = "0.6.3"
 __UNCAUGHT__ = "Uncaught exception:"
 __LOGDIR__ = os.path.expanduser(os.path.join('~', '.labslauncher'))
 
 
-class NotebookFlavour(Enum):
-    """Flavours of notebook interface."""
-
-    JUPYTER = "JupyterLab"
-    COLAB = "Colab"
-
-
-def get_colab_link(flavour, port, databind, token):
+def get_server_link(port, token):
     """Return the Welcome page link.
 
-    :param flavour: notebook flavour.
     :param port: notebook port.
-    :param databind: within container data location.
     :param token: notebook server token.
     """
-    if flavour == NotebookFlavour.COLAB:
-        link = (
-            "https://colab.research.google.com/github/epi2me-labs/"
-            "resources/blob/master/welcome.ipynb")
-    elif flavour == NotebookFlavour.JUPYTER:
-        link = (
-            "http://localhost:{port}/lab/tree/epi2me-resources/"
-            "resources/welcome.ipynb"
-            "?file-browser-path=/{databind}&token={token}")
-        link = link.format(port=port, databind=databind, token=token)
-    else:
-        raise ValueError("Unknown link flavour: {}".format(flavour))
+    link = (
+        "http://localhost:{port}/&token={token}")
+    link = link.format(port=port, token=token)
     return link
 
 
-def get_colab_help(flavour, port, databind, token):
-    """Return the notebook server help link.
-
-    :param flavour: notebook flavour.
-    :param port: notebook port.
-    :param databind: within container data location.
-    :param token: notebook server token.
-    """
-    if flavour == NotebookFlavour.COLAB:
-        link = (
-            "https://colab.research.google.com/github/epi2me-labs/"
-            "resources/blob/master/epi2me-labs-server.ipynb")
-    elif flavour == NotebookFlavour.JUPYTER:
-        link = (
-            "http://localhost:{port}/lab/tree/epi2me-resources/"
-            "resources/epi2me-labs-server.ipynb?"
-            "?file-browser-path=/{databind}&token={token}")
-        link = link.format(port=port, databind=databind, token=token)
-    else:
-        raise ValueError("Unknown help link flavour: {}".format(flavour))
-    return link
+def get_help_link():
+    """Return the notebook server help link."""
+    return "https://epi2me-labs.github.io/blog/quickstart/"
 
 
 def get_named_logger(name):
@@ -168,10 +131,6 @@ class Defaults(list):
             "The application version.",
             "version", __version__, False)
         self.append(
-            "Notebook Flavour",
-            "The application flavour (JupyterLab or Colab).",
-            "notebook_flavour", NotebookFlavour.COLAB, True)
-        self.append(
             "Registry",
             "The container registry from which to download images.",
             "registry", "docker.io", True)
@@ -183,6 +142,11 @@ class Defaults(list):
             "Fixed Tag",
             "Fix the container image to a specific tag.",
             "fixed_tag", "", True)
+        self.append(
+            "Help link",
+            "URL to quick start documentation.",
+            "help_link", "https://epi2me-labs.github.io/blog/quickstart/",
+            False)
         self.append(
             "Server Name",
             "The name given to the actively running container.",

@@ -26,7 +26,7 @@ from PyQt5.QtWidgets import (
 
 import labslauncher
 from labslauncher.dockerutil import DockerClient
-from labslauncher.qtext import ClickLabel, Settings, Worker
+from labslauncher.qtext import Settings, Worker
 
 
 class Screen(QWidget):
@@ -75,8 +75,8 @@ class HomeScreen(Screen):
         self.status_lbl = QLabel()
         self.status_lbl.setAlignment(Qt.AlignCenter)
         self.layout.addWidget(self.status_lbl)
-        self.address_lbl = ClickLabel()
-        self.address_lbl.clicked.connect(self.copy_address)
+        self.address_lbl = QLabel()
+        self.address_lbl.setOpenExternalLinks(True)
         self.address_lbl.setAlignment(Qt.AlignCenter)
         self.layout.addWidget(self.address_lbl)
         self.layout.addStretch(-1)
@@ -98,36 +98,13 @@ class HomeScreen(Screen):
         self.on_status(self.app.docker.status.value)
         self.on_tag(self.app.docker.tag.value)
 
-    @property
-    def colab_link(self):
-        """Return the "colab" welcome link.
-
-        ..note:: This link may not refer to Google Colab.
-        """
-        settings = self.app.settings
-        link = labslauncher.get_colab_link(
-            settings['notebook_flavour'], settings['port'],
-            settings['data_bind'].replace('/', ''), settings['token'])
-        return link
-
     def set_welcome_lbl_text(self):
         """Set Welcome hyperlink."""
-        template = \
-            "Navigate to the <a href='{}'>Welcome page</a> to get started."
-        self.welcome_lbl.setText(template.format(self.colab_link))
-
-    def copy_address(self):
-        """Copy server address to clipboard."""
-        self.cb.clear(mode=self.cb.Clipboard)
-        self.cb.setText(self.address_lbl.text(), mode=self.cb.Clipboard)
-        msg = QMessageBox()
-        msg.setText("Address copied")
-        msg.setInformativeText(
-            "The server address has been copied to the clipboard. "
-            "It can be used in the Google Colab interface to connect "
-            "to the notebook server.")
-        msg.setWindowTitle("Address Copied")
-        msg.exec_()
+        settings = self.app.settings
+        link = settings['help_link']
+        template = "See the <a href='{}'>Quick start</a> for help."
+        label = template.format(link)
+        self.welcome_lbl.setText(label)
 
     def on_stop(self):
         """Stop and remove the container."""
@@ -167,9 +144,9 @@ class HomeScreen(Screen):
         self.status_lbl.setText(
             'Server status: <b><font color="{}">{}</font></b>{}'.format(
                 color, new, extra_msg))
+        self.set_welcome_lbl_text()
 
         address = ""
-        self.address_lbl.setClickable(False)
         container = self.app.docker.container
         if container is not None and new == 'running':
             cargs = container.__dict__['attrs']['Args']
@@ -178,8 +155,8 @@ class HomeScreen(Screen):
                     port = int(c.split('=')[1])
                 elif c.startswith('--NotebookApp.token='):
                     token = c.split('=')[1]
-            self.address_lbl.setClickable(True)
-            address = "http://localhost:{}?token={}".format(port, token)
+            address = labslauncher.get_server_link(port, token)
+            address = "<a href='{}'>Open EPI2MELabs</a>".format(address)
         self.address_lbl.setText(address)
         self.repaint()
 
@@ -597,11 +574,7 @@ class LabsLauncher(QMainWindow):
 
     def show_help(self):
         """Open webbrowser with application help."""
-        settings = self.settings
-        link = labslauncher.get_colab_help(
-            settings['notebook_flavour'], settings['port'],
-            settings['data_bind'].replace('/', ''), settings['token'])
-        webbrowser.open(link)
+        webbrowser.open(self.settings['help_link'])
 
     def show_home(self):
         """Move to the home screen."""
