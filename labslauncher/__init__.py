@@ -22,7 +22,7 @@ def get_server_link(port, token):
     :param token: notebook server token.
     """
     link = (
-        "http://localhost:{port}/?token={token}")
+        "http://localhost:{port}/?file-browser-path=/epi2melabs&token={token}")
     link = link.format(port=port, token=token)
     return link
 
