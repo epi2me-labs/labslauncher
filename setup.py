@@ -33,22 +33,10 @@ if mo:
 else:
     raise RuntimeError('Unable to find version string in "{}/__init__.py".'.format(__pkg_name__))
 
-# Replace some defaults for non-colab build
-use_colab = not bool(int(os.environ.get("NOCOLAB", False)))
-print("*** Using colab: {}".format(use_colab))
-with fileinput.input(
-        files=[os.path.join(__pkg_name__, '__init__.py')],
-        inplace=True, backup='.bck') as fh:
-    for line in fh:
-        if '"notebook_flavour", NotebookFlavour' in line:
-            flavour = ["JUPYTER", "COLAB"][use_colab]
-            line = re.sub(r"Flavour\..*\,", "Flavour.{},".format(flavour), line)
-        print(line, end="")
-
 dir_path = os.path.dirname(__file__)
 with open(os.path.join(dir_path, 'requirements.txt')) as fh:
     install_requires = [
-        str(requirement) for requirement in 
+        str(requirement) for requirement in
         pkg_resources.parse_requirements(fh)]
 
 data_files = []
