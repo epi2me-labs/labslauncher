@@ -77,6 +77,9 @@ clean:
 
 
 deb: clean dist/EPI2ME-Labs-Launcher
+	# To make a deb package, we simply copy all files from the pyinstaller bundle
+	# Note the postrm script removes everything under /usr/local/bin/EPI2ME-Labs-Launcher
+	# on the target filesystem for good measure.
 	echo $(PROJECT)
 	echo $(CONFLICTPROJECT)
 	rm -rf deb-src/usr

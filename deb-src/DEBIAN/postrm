@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# no harm in removing everything
+rm -rf /usr/local/bin/EPI2ME-Labs-Launcher
