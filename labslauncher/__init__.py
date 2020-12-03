@@ -10,7 +10,7 @@ from PyQt5 import sip  # noqa: F401
 from PyQt5.QtWidgets import QMessageBox
 
 
-__version__ = "0.6.5"
+__version__ = "1.0.0"
 __UNCAUGHT__ = "Uncaught exception:"
 __LOGDIR__ = os.path.expanduser(os.path.join('~', '.labslauncher'))
 
@@ -132,7 +132,7 @@ class Defaults(list):
         self.append(
             "Image",
             "The container image to use from dockerhub.",
-            "image_name", "ontresearch/nanolabs-notebook", True)
+            "image_name", "ontresearch/epi2melabs-notebook", True)
         self.append(
             "Fixed Tag",
             "Fix the container image to a specific tag.",
