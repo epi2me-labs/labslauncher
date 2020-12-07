@@ -177,6 +177,12 @@ class Defaults(list):
             " --no-browser"
             " --notebook-dir=/", False)
         self.append(
+            "HTTPS proxy",
+            "HTTPS proxy for requests to docker.com (including https://).\n"
+            "Note: it will still be necessary to configure docker to use "
+            "a proxy.",
+            "proxy", "", True)
+        self.append(
             "Docker arguments",
             "Extra arguments to provide to `docker run`.",
             "docker_args", "", True)

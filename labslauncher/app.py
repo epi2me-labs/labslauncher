@@ -358,7 +358,7 @@ class StartScreen(Screen):
             config['Container'] = {
                 'mount': mount, 'port': port, 'aux_port': aux_port,
                 'image_tag': self.app.docker.latest_available_tag,
-                'latest_tag': self.app.docker.latest_tag,
+                'latest_tag': str(self.app.docker.latest_tag),
                 'id': self.app.docker.container.id}
             config['Pings'] = {'enabled': self.app.settings["send_pings"]}
             fname = os.path.join(mount, os.path.basename(ping.CONTAINER_META))
@@ -518,11 +518,14 @@ class LabsLauncher(QMainWindow):
         fixed_tag = self.settings["fixed_tag"]
         if fixed_tag == "":
             fixed_tag = None
+        proxy = None
+        if self.settings["proxy"] != "":
+            proxy = {"https": self.settings["proxy"]}
         self.docker = DockerClient(
             self.settings["image_name"], self.settings["server_name"],
             self.settings["data_bind"], self.settings["container_cmd"],
             host_only=self.settings["docker_restrict"],
-            fixed_tag=fixed_tag)
+            fixed_tag=fixed_tag, proxies=proxy)
 
         self.ping_timer = QTimer(self)
         self.pinger = ping.Pingu()
