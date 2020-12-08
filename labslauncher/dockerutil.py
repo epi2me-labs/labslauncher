@@ -7,6 +7,7 @@ import platform
 import traceback
 
 from cachetools import cached, TTLCache
+from cachetools.keys import hashkey
 import docker
 from PyQt5.QtCore import QTimer
 from ratelimitingfilter import RateLimitingFilter
@@ -17,16 +18,26 @@ import labslauncher
 from labslauncher import qtext
 
 
-@cached(cache=TTLCache(maxsize=1, ttl=300))
-def _get_image_meta(image):
+def proxieskey(*args, proxies=None, **kwargs):
+    """Key function to allow hashing function below."""
+    key = hashkey(*args, **kwargs)
+    if proxies is not None:
+        key += tuple(sorted(proxies.items()))
+    return key
+
+
+@cached(cache=TTLCache(maxsize=1, ttl=300), key=proxieskey)
+def _get_image_meta(image, proxies=None):
     """Retrieve meta data from docker hub for tags of an image.
 
     :param image: image name.
     """
+    if proxies is None:
+        proxies = dict()
     tags = list()
     addr = 'https://hub.docker.com/v2/repositories/{}/tags'.format(image)
     while True:
-        response = requests.get(addr)
+        response = requests.get(addr, proxies=proxies)
         tags_data = json.loads(response.content.decode())
         tags.extend(tags_data['results'])
         if tags_data['next'] is not None:
@@ -36,15 +47,22 @@ def _get_image_meta(image):
     return tags
 
 
-def get_image_tags(image, prefix='v'):
+def get_image_tags(image, prefix='v', proxies=None):
     """Retrieve tags from dockerhub of an image.
 
     :param image: image name, organisation/repository.
     :param prefix: prefix by which to filter images.
 
     :returns: sorted list of tags, newest first, ordered by semver.
+        Or the list [None] if an error occurs fetching tag meta information.
     """
-    tags_data = _get_image_meta(image)
+    try:
+        tags_data = _get_image_meta(image, proxies=proxies)
+    except Exception as e:
+        logger = labslauncher.get_named_logger("ImageMeta")
+        logger.warning(e)
+        logger.warning("Failed to fetch image information from dockerhub.")
+        return [None]
     tags = list()
     for t in tags_data:
         name = t['name']
@@ -65,14 +83,14 @@ def get_image_tags(image, prefix='v'):
 
 
 @functools.lru_cache(5)
-def get_image_meta(image, tag):
+def get_image_meta(image, tag, proxies=None):
     """Retrieve meta data from docker hub for a tag.
 
     :param image: image name.
     :param tag: image tag.
 
     """
-    tags_data = _get_image_meta(image)
+    tags_data = _get_image_meta(image, proxies=proxies)
     for t in tags_data:
         name = t['name']
         if name == tag:
@@ -80,7 +98,7 @@ def get_image_meta(image, tag):
     raise IndexError("Tag was not found: \"{}\"".format(tag))
 
 
-def newest_tag(image, tags=None, client=None):
+def newest_tag(image, tags=None, client=None, proxies=None):
     """Find the newest available local tag of an image.
 
     :param tag: list of tags, if None dockerhub is queried.
@@ -89,7 +107,7 @@ def newest_tag(image, tags=None, client=None):
     if client is None:
         client = docker.from_env()
     if tags is None:
-        tags = get_image_tags(image)
+        tags = get_image_tags(image, proxies=proxies)
 
     latest = None
     for tag in tags:
@@ -103,7 +121,7 @@ def newest_tag(image, tags=None, client=None):
     return latest
 
 
-def pull_with_progress(image, tag):
+def pull_with_progress(image, tag, proxies=None):
     """Pull an image, yielding download progress.
 
     :param image: image name.
@@ -117,7 +135,7 @@ def pull_with_progress(image, tag):
         if path not in os.environ['PATH']:
             os.environ['PATH'] = "{}:{}".format(path, os.environ['PATH'])
 
-    image_tag = get_image_meta(image, tag)
+    image_tag = get_image_meta(image, tag, proxies=proxies)
     total = image_tag['full_size']
 
     # to get feedback we need to use the low-level API
@@ -143,7 +161,7 @@ class DockerClient():
 
     def __init__(
             self, image_name, server_name, data_bind, container_cmd,
-            host_only, fixed_tag=None, registry='docker.io'):
+            host_only, fixed_tag=None, registry='docker.io', proxies=None):
         """Initialize the client."""
         self.image_name = image_name
         self.server_name = server_name
@@ -152,6 +170,7 @@ class DockerClient():
         self.host_only = host_only
         self.fixed_tag = fixed_tag
         self.registry = registry
+        self.proxies = proxies
         # TODO: plumb in registry
         self.logger = labslauncher.get_named_logger("DckrClnt")
         # throttle connection errors to once every 5 minutes
@@ -167,9 +186,10 @@ class DockerClient():
            data bind: {}
            command: {}
            host only: {}
-           fixed tag: {}""".format(
+           fixed tag: {}
+           proxies: {}""".format(
                image_name, server_name, data_bind, container_cmd,
-               host_only, fixed_tag))
+               host_only, fixed_tag, proxies))
         self._client = None
         self.total_size = None
         self.final_stats = None
@@ -225,19 +245,23 @@ class DockerClient():
         """Return the latest tag on dockerhub."""
         if self.fixed_tag is not None:
             return self.fixed_tag
-        return get_image_tags(self.image_name)[0]
+        return get_image_tags(
+            self.image_name, proxies=self.proxies)[0]
 
     @property
     def latest_available_tag(self):
         """Return the latest tag available locally."""
         if self.fixed_tag is not None:
             return self.fixed_tag
-        return newest_tag(self.image_name, client=self.docker)
+        return newest_tag(
+            self.image_name, client=self.docker, proxies=self.proxies)
 
     @property
     def update_available(self):
         """Return whether an updated tag available on dockerhub."""
         if not self._available.value:
+            return False
+        if self.latest_tag is None:
             return False
         return self.latest_available_tag != self.latest_tag
 
@@ -250,7 +274,9 @@ class DockerClient():
         if tag is None:
             tag = self.latest_available_tag
         if tag is None:
-            raise ValueError("No local tag.")
+            raise ValueError(
+                "No local image tag available. Please check you are "
+                "connected to the internet.")
         return "{}:{}".format(self.image_name, tag)
 
     def image(self, tag=None, update=False):
@@ -291,7 +317,9 @@ class DockerClient():
 
         # to get feedback we need to use the low-level API
         self.total_size = None
-        for current, total in pull_with_progress(self.image_name, tag):
+        puller = pull_with_progress(
+            self.image_name, tag, proxies=self.proxies)
+        for current, total in puller:
             if stopped is not None and stopped.is_set():
                 return None
             if progress is not None:
