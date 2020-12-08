@@ -10,7 +10,7 @@ from PyQt5 import sip  # noqa: F401
 from PyQt5.QtWidgets import QMessageBox
 
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 __UNCAUGHT__ = "Uncaught exception:"
 __LOGDIR__ = os.path.expanduser(os.path.join('~', '.labslauncher'))
 
@@ -177,11 +177,21 @@ class Defaults(list):
             " --no-browser"
             " --notebook-dir=/", False)
         self.append(
+            "HTTP proxy",
+            "HTTP proxy for use inside container.\n"
+            "Note: it will still be necessary to configure separately docker "
+            "to use a proxy.",
+            "http_proxy", "", True)
+        self.append(
             "HTTPS proxy",
             "HTTPS proxy for requests to docker.com (including https://).\n"
-            "Note: it will still be necessary to configure docker to use "
-            "a proxy.",
-            "proxy", "", True)
+            "Note: it will still be necessary to configure separately docker "
+            "to use a proxy.",
+            "https_proxy", "", True)
+        self.append(
+            "FTP proxy",
+            "FTP proxy for use inside container.",
+            "ftp_proxy", "", True)
         self.append(
             "Docker arguments",
             "Extra arguments to provide to `docker run`.",
