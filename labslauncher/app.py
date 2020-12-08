@@ -650,7 +650,10 @@ class LabsLauncher(QMainWindow):
         if state == 'stop':
             stats = self.docker.final_stats
         else:
-            stats = self.docker.container.stats(stream=False)
+            if self.docker.container is None:
+                return
+            else:
+                stats = self.docker.container.stats(stream=False)
         self.logger.info("Sending ping data, state={}.".format(state))
         self.pinger.send_container_ping(
             state, stats, self.docker.image_name)
