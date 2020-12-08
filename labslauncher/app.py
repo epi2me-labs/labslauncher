@@ -519,8 +519,12 @@ class LabsLauncher(QMainWindow):
         if fixed_tag == "":
             fixed_tag = None
         proxy = None
-        if self.settings["proxy"] != "":
-            proxy = {"https": self.settings["proxy"]}
+        for protocol in ('ftp', 'http', 'https'):
+            value = self.settings["{}_proxy".format(protocol)]
+            if value != "":
+                if proxy is None:
+                    proxy = dict()
+                proxy[protocol] = value
         self.docker = DockerClient(
             self.settings["image_name"], self.settings["server_name"],
             self.settings["data_bind"], self.settings["container_cmd"],

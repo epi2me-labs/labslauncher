@@ -367,12 +367,22 @@ class DockerClient():
                 ports = {
                     int(port): ('127.0.0.1', int(port)),
                     int(aux_port): ('127.0.0.1', int(aux_port))}
+
+            environment = ['JUPYTER_ENABLE_LAB=yes']
+            if self.proxies is not None:
+                for protocol, server in self.proxies.items():
+                    env = '{}_proxy'.format(protocol.lower())
+                    environment.append('{}={}'.format(env, server))
+                    env = env.upper()
+                    environment.append('{}={}'.format(env, server))
+
+            self.logger.info("Container environment: {}.".format(environment))
             self.docker.containers.run(
                 self.full_image_name(),
                 CMD,
                 detach=True,
                 ports=ports,
-                environment=['JUPYTER_ENABLE_LAB=yes'],
+                environment=environment,
                 volumes={
                     mount: {
                         'bind': self.data_bind, 'mode': 'rw'}},
