@@ -3,8 +3,8 @@ docker==4.2.0
 epi2melabs==0.0.11
 password_strength==0.0.3.post2
 PyInstaller==3.6
-pyqt5==5.14.2
-pyqt5-sip==12.7.2
+pyqt5==5.15.2
+pyqt5-sip==12.8.1
 ratelimitingfilter==1.2
 requests==2.20.0
 semver==2.9.1
