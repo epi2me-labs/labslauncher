@@ -171,8 +171,6 @@ class Defaults(list):
             "Command line arguments to run notebook server.",
             "container_cmd",
             "start-notebook.sh "
-            " --NotebookApp.allow_origin='https://colab.research.google.com'"
-            " --NotebookApp.disable_check_xsrf=True"
             " --NotebookApp.port_retries=0"
             " --no-browser"
             " --notebook-dir=/", False)
