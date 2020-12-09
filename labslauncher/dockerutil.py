@@ -361,7 +361,8 @@ class DockerClient():
             CMD = ['run_as_user.sh', str(uid)] + CMD
 
         try:
-            # note: colab requires the port in the container to be equal
+            # note: colab requires the port in the container to be equal,
+            # we don't use colab anymore but keep this for simplicity
             ports = {int(port): int(port), int(aux_port): int(aux_port)}
             if self.host_only:
                 ports = {
