@@ -10,7 +10,7 @@ from PyQt5 import sip  # noqa: F401
 from PyQt5.QtWidgets import QMessageBox
 
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 __UNCAUGHT__ = "Uncaught exception:"
 __LOGDIR__ = os.path.expanduser(os.path.join('~', '.labslauncher'))
 
