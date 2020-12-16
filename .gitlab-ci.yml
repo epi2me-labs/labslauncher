@@ -155,7 +155,7 @@ push-github:
         - git push github ${CI_COMMIT_TAG}
         # Make a github release page
         - git clone https://github.com/epi2me-labs/github_release
-        - pip install -r github_release/requirements.txt
+        - pip3 install -r github_release/requirements.txt
         - github_release/make_release ${CI_PROJECT_NAME} ${CI_COMMIT_TAG} CHANGELOG.md ${LABS_BOT_GH_TOKEN}
           --artifacts ont-epi2melabs-installer-*-win10.exe ont-epi2melabs-launcher-*.deb ont-epi2melabs-launcher-*-macos.app.zip
     only:
