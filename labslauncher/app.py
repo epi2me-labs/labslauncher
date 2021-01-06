@@ -12,6 +12,7 @@ import sys
 import webbrowser
 
 from epi2melabs import ping
+import markdown
 from password_strength import PasswordPolicy
 from pkg_resources import resource_filename
 from PyQt5.QtCore import (
@@ -21,8 +22,8 @@ from PyQt5.QtGui import QIcon, QIntValidator, QPixmap
 from PyQt5.QtWidgets import (
     QAction, QApplication, QCheckBox, QComboBox, QDesktopWidget, QDialog,
     QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
-    QMessageBox, QProgressBar, QPushButton, QStackedWidget, QVBoxLayout,
-    QWidget)
+    QMessageBox, QProgressBar, QPushButton, QStackedWidget, QTextEdit,
+    QVBoxLayout, QWidget)
 
 import labslauncher
 from labslauncher.dockerutil import DockerClient
@@ -420,7 +421,7 @@ class StartScreen(Screen):
 
 
 class DownloadDialog(QDialog):
-    """About dialog."""
+    """Download dialog."""
 
     def __init__(self, progress, parent=None):
         """Initialize the dialog."""
@@ -458,7 +459,7 @@ class DownloadDialog(QDialog):
 class UpdateScreen(Screen):
     """Screen to display message that image update is available."""
 
-    goto_start = Signal()
+    goto_next = Signal()
     update_text = (
         "<b>Update available</b><br>"
         "An update to the notebook server is available. Updating the "
@@ -481,11 +482,38 @@ class UpdateScreen(Screen):
         self.l0 = QHBoxLayout()
         self.layout.insertStretch(-1)
         self.dismiss_btn = QPushButton("OK")
-        self.dismiss_btn.clicked.connect(self.goto_start.emit)
+        self.dismiss_btn.clicked.connect(self.goto_next.emit)
         self.l0.addWidget(self.dismiss_btn)
         self.layout.addLayout(self.l0)
 
         self.setLayout(self.layout)
+
+
+class AppUpdateScreen(UpdateScreen):
+    """Screen to display message that image update is available."""
+
+    goto_next = Signal()
+    update_text = (
+        "<b>Update available</b><br>"
+        "An update to the EPI2MELabs Launcher is available. Updating the "
+        "Launcher is recommended for all users. Please use the Download "
+        "button below to open the downloads page in your web browser.<br><br>"
+        "Current version: {}.<br>"
+        "Latest version: {}.<br>"
+        "<br>{}")
+
+    def __init__(self, parent=None):
+        """Initialize the screen."""
+        super().__init__(parent=parent)
+
+        self.download_btn = QPushButton("Download")
+        self.download_btn.clicked.connect(self.open_download)
+        self.l0.addWidget(self.download_btn)
+
+    def open_download(self):
+        """Open download page in web browser."""
+        webbrowser.open(self.app.settings['download_link'])
+        self.goto_next.emit()
 
 
 class LabsLauncher(QMainWindow):
@@ -500,6 +528,11 @@ class LabsLauncher(QMainWindow):
         self.version = labslauncher.__version__
         self.logger = labslauncher.get_named_logger("Launcher")
         self.about = About(self.version)
+        releases = labslauncher.app_releases(
+            repository=self.settings['github_repo'],
+            user=self.settings['github_user'],
+            token=self.settings['github_token'])
+        self.change_log = ChangeLog(releases)
         self.settings_dlg = SettingsDlg(self.settings, parent=self)
 
         self.setWindowTitle("EPI2ME Labs Launcher")
@@ -549,6 +582,9 @@ class LabsLauncher(QMainWindow):
         self.about_act = QAction('About', self)
         self.about_act.triggered.connect(self.about.show)
         self.help_menu.addAction(self.about_act)
+        self.change_log_act = QAction('Change log', self)
+        self.change_log_act.triggered.connect(self.change_log.show)
+        self.help_menu.addAction(self.change_log_act)
         self.help_act = QAction("Help", self)
         self.help_act.triggered.connect(self.show_help)
         self.help_menu.addAction(self.help_act)
@@ -557,9 +593,12 @@ class LabsLauncher(QMainWindow):
         self.home = HomeScreen(parent=self)
         self.start = StartScreen(parent=self)
         self.update = UpdateScreen(parent=self)
+        self.app_update = AppUpdateScreen(parent=self)
+        # TODO: several parts of the code use the stack indexes
         self.stack.addWidget(self.home)
         self.stack.addWidget(self.start)
         self.stack.addWidget(self.update)
+        self.stack.addWidget(self.app_update)
         self.layout.addWidget(self.stack)
 
         w = QWidget()
@@ -568,9 +607,11 @@ class LabsLauncher(QMainWindow):
 
         self.home.goto_start.connect(self.show_start)
         self.start.goto_home.connect(self.show_home)
-        self.update.goto_start.connect(
+        self.update.goto_next.connect(
             functools.partial(self.stack.setCurrentIndex, 1))
-        self.show_home()
+        self.app_update.goto_next.connect(
+            functools.partial(self.stack.setCurrentIndex, 0))
+        self.maybe_show_app_update()
         self.logger.info("Application started.")
 
     def closeEvent(self, event):
@@ -586,6 +627,28 @@ class LabsLauncher(QMainWindow):
     def show_home(self):
         """Move to the home screen."""
         self.stack.setCurrentIndex(0)
+
+    def maybe_show_app_update(self):
+        """Move to the application update screen."""
+        releases = labslauncher.app_releases(
+            repository=self.settings['github_repo'],
+            user=self.settings['github_user'],
+            token=self.settings['github_token'])
+        if len(releases) > 0:
+            release = releases[0]
+            cur = "v{}".format(labslauncher.__version__)
+            new = release.title
+            self.logger.info("Latest release: {}".format(new))
+            body = markdown.markdown(release.body).replace('h3', 'b')
+            if cur != new:
+                self.app_update.update_lbl.setText(
+                    self.app_update.update_text.format(cur, new, body))
+                self.app_update.update_lbl.setWordWrap(True)
+                self.stack.setCurrentIndex(3)
+            else:
+                self.show_home()
+        else:
+            self.show_home()
 
     def show_start(self):
         """Move to the start screen."""
@@ -686,6 +749,29 @@ class About(QDialog):
             "".format(version, PYQT_VERSION_STR, QT_VERSION_STR))
         self.layout.addWidget(self.label)
         self.setLayout(self.layout)
+
+
+class ChangeLog(QDialog):
+    """Application changelog dialog."""
+
+    def __init__(self, releases, parent=None):
+        """Initialize the dialog."""
+        super().__init__(parent)
+        self.setWindowTitle("Change Log")
+        self.layout = QVBoxLayout()
+        text = list()
+        for release in releases:
+            text.append("<h3>{}</h3>".format(release.title))
+            text.append(
+                markdown.markdown(release.body).replace('h3', 'b'))
+        if len(text) > 0:
+            text = "".join(t for t in text)
+        else:
+            text = "Change log unavailable."
+        self.label = QTextEdit(text)
+        self.layout.addWidget(self.label)
+        self.setLayout(self.layout)
+        self.setFixedSize(400, 400)
 
 
 class SettingsDlg(QDialog):

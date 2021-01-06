@@ -1,11 +1,13 @@
 cachetools==4.1.0
 docker==4.2.0
 epi2melabs==0.0.11
+Markdown==3.2.2
 password_strength==0.0.3.post2
 PyInstaller==3.6
+PyGithub==1.54
 pyqt5==5.15.2
 pyqt5-sip==12.8.1
 ratelimitingfilter==1.2
 requests==2.20.0
-semver==2.9.1
+semver==2.13.0
 setuptools < 45
