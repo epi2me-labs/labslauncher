@@ -193,6 +193,7 @@ class DockerClient():
         self._client = None
         self.total_size = None
         self.final_stats = None
+        self.last_failure_type = None
         self.is_running()  # sets up tag, status, and available
         self.heartbeat = QTimer()
         self.heartbeat.setInterval(1000*5)  # 5 seconds
@@ -400,7 +401,8 @@ class DockerClient():
                 self.logger.warning("Detected that sharing was disabled.")
                 self.last_failure_type = "file_share"
         else:
-            self.logger.info("Container started.")
+            self.logger.info("Container started: {} {}".format(
+                self.container.id, self.full_image_name()))
         self.final_stats = None
         self.set_status()
 
