@@ -1,6 +1,8 @@
 __pycache__/
 build/
 dist/
+venv/
+labslauncher.egg-info/
 *.swp
 *.deb
 deb-src/DEBIAN/md5sums
