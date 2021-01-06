@@ -6,9 +6,10 @@ import os
 import sys
 import traceback
 
+import github
 from PyQt5 import sip  # noqa: F401
 from PyQt5.QtWidgets import QMessageBox
-
+import semver
 
 __version__ = "1.0.3"
 __UNCAUGHT__ = "Uncaught exception:"
@@ -80,6 +81,53 @@ def uncaught_filter(message):
     return filt
 
 
+def app_releases(
+        repository, token=None, user=None,
+        release_prefix='v', drafts=False):
+    """Fetch (GitHub) release versions.
+
+    :param repository: repository name.
+    :param token: GitHub API token.
+    :param user: GitHub user.
+    :param release_prefix: string to remove from front of release name before
+       semantic version comparison.
+    :param drafts: allow draft releases.
+
+    :returns: a list of `github.GitRelease.GitRelease`
+
+    One of `token` or `user` must be given. The newest release is identified
+    by interpreting release names as semantic versioning versions after
+    removing `release_prefix` if present.
+    """
+    logger = get_named_logger("GHRlease")
+    if token == "":
+        token = None
+    try:
+        if token is None and user is None:
+            raise ValueError("One of `token` or `user` must be given")
+        gh = github.Github(token)
+        gh_user = gh.get_user(user)
+        try:
+            repo = gh_user.get_repo(repository)
+        except github.UnknownObjectException:
+            return list()
+
+        def key(release):
+            return semver.VersionInfo.parse(
+                release.title[len(release_prefix):])
+
+        releases = [
+            release
+            for release in repo.get_releases()
+            if ((drafts or not release.draft)
+                and release.title.startswith(release_prefix))]
+        return sorted(releases, key=key, reverse=True)
+    except github.RateLimitExceededException:
+        logger.warning(
+            "Failed to get release information due to Github Exception.")
+        return list()
+
+
 class Defaults(list):
     """A helper class to create configuration data."""
 
@@ -140,7 +188,12 @@ class Defaults(list):
         self.append(
             "Help link",
             "URL to quick start documentation.",
-            "help_link", "https://epi2me-labs.github.io/quickstart/",
+            "help_link", "https://labs.epi2me.io/quickstart/",
+            False)
+        self.append(
+            "Download link",
+            "URL to download page.",
+            "download_link", "https://labs.epi2me.io/downloads/",
             False)
         self.append(
             "Server Name",
@@ -202,3 +255,15 @@ class Defaults(list):
             "Send pings",
             "Send usage statistics to ONT.",
             "send_pings", True, False)
+        self.append(
+            "GitHub repository",
+            "GitHub repository to use when checking for update.",
+            "github_repo", "labslauncher", False)
+        self.append(
+            "GitHub user",
+            "GitHub username to use when checking for update.",
+            "github_user", "epi2me-labs", False)
+        self.append(
+            "GitHub token",
+            "GitHub auth token to use when checking for update.",
+            "github_token", "", False)

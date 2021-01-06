@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [unreleased]
 ### Fixed
  - Added extra libraries required on Ubuntu after Qt upgrade
+### Added
+ - Application update notification on start.
+ - Changelog dialog to help menu.
 
 ## [v1.0.3] - 2020-12-16
 ### Changed
