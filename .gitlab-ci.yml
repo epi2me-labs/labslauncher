@@ -10,21 +10,20 @@ test:
         - linux
     before_script:
         - export DEBIAN_FRONTEND=noninteractive
-        - apt-get update -qq && apt-get install -y -qq
-          python-virtualenv python3-dev
+        - apt-get update -qq && apt-get install -y -qq python3-dev
+        - wget https://bootstrap.pypa.io/get-pip.py
+        - python3 ./get-pip.py
+        - pip install virtualenv
     script:
         - PYTHON=python3 make test
 
 ###
 # Windows
 #
-.build-win: &build-win
+windows-package:
     stage: build
     tags:
         - epi2melabs-win
-
-build-win-colab:
-    <<: *build-win
     variables:
         NOCOLAB: 0
     script:
@@ -36,23 +35,20 @@ build-win-colab:
 
 ###
 # macos
-# #
-.build-macos: &build-macos
+#
+macos-package:
     stage: build
     tags:
         - macos
         - oxford
-
-build-macos-colab:
-    <<: *build-macos
     variables:
         NOCOLAB: 0
     script:
-        - PYTHON=$(PYENV_VERSION=3.6.11 pyenv which python) make build
-        - cd dist; zip -r ../ont-epi2melabs-launcher-${CI_COMMIT_REF_NAME}-macos.app.zip EPI2ME-Labs-Launcher.app
+        - PYTHON=$(PYENV_VERSION=3.6.11 pyenv which python) make dmg
+        - mv dist/EPI2ME-Labs-Launcher.dmg ont-epi2melabs-launcher-${CI_COMMIT_REF_NAME}-macos.dmg
     artifacts:
         paths:
-            - "ont-epi2melabs-launcher-${CI_COMMIT_REF_NAME}-macos.app.zip"
+            - "ont-epi2melabs-launcher-${CI_COMMIT_REF_NAME}-macos.dmg"
 
 ###
 # Ubuntu
@@ -65,9 +61,12 @@ build-macos-colab:
     script:
         - export DEBIAN_FRONTEND=noninteractive
         - apt-get update -qq && apt-get install -y -qq
-          build-essential wget fakeroot rsync ssh python-virtualenv python3-dev
+          build-essential wget fakeroot rsync ssh python3-dev
           xvfb libx11-xcb1 libxext6 libxrender1 libxcb-xinerama0
           libsm6 libice6 libglib2.0-0
+        - wget https://bootstrap.pypa.io/get-pip.py
+        - python3 ./get-pip.py
+        - pip install virtualenv
         - PYTHON=python3 make deb
         - dpkg -I ont-epi2melabs-launcher*.deb
     artifacts:
@@ -76,48 +75,109 @@ build-macos-colab:
     except:
         - tags
 
-.setup-tag: &tag
+.setup-tag: &tag-package-check
     before_script:
         - IFS='.' read -ra PARTS <<< "${CI_COMMIT_TAG}"
         - export MAJOR=${PARTS[0]:1}
         - export MINOR=${PARTS[1]}
         - export SUB=${PARTS[2]}
-        - export DEBVER="$MAJOR.$MINOR.$SUB"
+        - export PACKVER="$MAJOR.$MINOR.$SUB"
         # check the version in the python package matches the tag
         - PYVER=$(grep "__version__ = " labslauncher/__init__.py | awk '{gsub("\"","",$3); print $3}')
-        - echo "DEBVER='$DEBVER'   PYVER='$PYVER'"
-        - if [[ "$PYVER" != "$DEBVER" ]]; then echo "Mismatching TAG and PACKAGE versions"; exit 1; else echo "TAG and PACKAGE versions agree."; fi
+        - echo "PACKVER='$PACKVER'   PYVER='$PYVER'"
+        - if [[ "$PYVER" != "$PACKVER" ]]; then echo "Mismatching TAG and PACKAGE versions"; exit 1; else echo "TAG and PACKAGE versions agree."; fi
         - echo -e "\e[1m\e[34mTagging with '\e[35m$MAJOR.$MINOR.$SUB\e[34m'\e[0m"
     only:
         - /^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$/
     except:
         - branches
 
-.xenial-colab: &xenial-colab
+.xenial: &xenial
     <<: *build-ubuntu
     variables:
         IMAGEUSED: ${IMAGE}:16.04
         NOCOLAB: 0
 
-.bionic-colab: &bionic-colab
+.bionic: &bionic
     <<: *build-ubuntu
     variables:
         IMAGEUSED: ${IMAGE}:18.04
         NOCOLAB: 0
 
+.focal: &focal
+    <<: *build-ubuntu
+    variables:
+        IMAGEUSED: ${IMAGE}:20.04
+        NOCOLAB: 0
+
 # branches
-xenial-deb-colab:
-    <<: *xenial-colab
-bionic-deb-colab:
-    <<: *bionic-colab
+xenial-deb:
+    <<: *xenial
+bionic-deb:
+    <<: *bionic
+focal-deb:
+    <<: *focal
 
 # tags
-xenial-tag-colab:
-    <<: *xenial-colab
-    <<: *tag
-bionic-tag-colab:
-    <<: *bionic-colab
-    <<: *tag
+xenial-tag:
+    <<: *xenial
+    <<: *tag-package-check
+bionic-tag:
+    <<: *bionic
+    <<: *tag-package-check
+focal-tag:
+    <<: *focal
+    <<: *tag-package-check
+
+###
+# Centos
+#
+.build-centos: &build-centos
+    image: ${IMAGEUSED}
+    stage: build
+    tags:
+        - linux
+    script:
+        - yum install -y python3 wget make mesa-libGL
+          fontconfig freetype freetype-devel fontconfig-devel libstdc++ 
+          xcb-util-wm xcb-util-image xcb-util-renderutil libxkbcommon libxkbcommon-x11
+          rpm-build rpm-devel rpmdevtools chrpath 
+        - wget https://bootstrap.pypa.io/get-pip.py
+        - python3 ./get-pip.py
+        - pip install virtualenv
+        - PYTHON=python3 make rpm
+        - mv /root/rpmbuild/RPMS/x86_64/ont-epi2melabs-launcher*.rpm .
+    artifacts:
+        paths:
+            - "ont-epi2melabs-launcher*.rpm"
+    except:
+        - tags
+
+.centos7: &centos7
+    <<: *build-centos
+    variables:
+        IMAGEUSED: centos:centos7
+        NOCOLAB: 0
+
+.centos8: &centos8
+    <<: *build-centos
+    variables:
+        IMAGEUSED: centos:centos8
+        NOCOLAB: 0
+
+# branches
+centos7-rpm:
+    <<: *centos7
+centos8-rpm:
+    <<: *centos8
+
+# tags
+centos7-tag:
+    <<: *centos7
+    <<: *tag-package-check
+centos8-tag:
+    <<: *centos8
+    <<: *tag-package-check
 
 
 ###
@@ -132,7 +192,8 @@ bundle:
         paths:
             - "ont-epi2melabs-installer-*-win10.exe"
             - "ont-epi2melabs-launcher-*.deb"
-            - "ont-epi2melabs-launcher-*-macos.app.zip"
+            - "ont-epi2melabs-launcher-*-macos.dmg"
+            - "ont-epi2melabs-launcher-*.x86_64.rpm"
 
 
 push-github:
@@ -159,7 +220,7 @@ push-github:
         - git clone https://github.com/epi2me-labs/github_release
         - pip3 install -r github_release/requirements.txt
         - github_release/make_release ${CI_PROJECT_NAME} ${CI_COMMIT_TAG} CHANGELOG.md ${LABS_BOT_GH_TOKEN}
-          --artifacts ont-epi2melabs-installer-*-win10.exe ont-epi2melabs-launcher-*.deb ont-epi2melabs-launcher-*-macos.app.zip
+          --artifacts ont-epi2melabs-installer-*-win10.exe ont-epi2melabs-launcher-*.deb ont-epi2melabs-launcher-*-macos.dmg ont-epi2melabs-launcher-*.x86_64.rpm
     only:
         - tags
 
@@ -174,7 +235,7 @@ push-debs:
     <<: *setup-deb-push
     stage: push
     script:
-        - for CODENAME in xenial bionic; do scp -o StrictHostKeyChecking=no *${CODENAME}.deb ${DEBREPO}:/var/www/apt/${CODENAME}-stable; done
+        - for CODENAME in xenial bionic focal; do scp -o StrictHostKeyChecking=no *${CODENAME}.deb ${DEBREPO}:/var/www/apt/${CODENAME}-stable; done
     only:
         - /^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$/
     except:
@@ -184,10 +245,11 @@ push-external:
     <<: *setup-deb-push
     stage: push
     script:
-        - for CODENAME in xenial bionic; do scp -o StrictHostKeyChecking=no *${CODENAME}.deb ${EXTERNALDEBREPO}:/mirror/apt/incoming/${CODENAME}-stable; done
+        - for CODENAME in xenial bionic focal; do scp -o StrictHostKeyChecking=no *${CODENAME}.deb ${EXTERNALDEBREPO}:/mirror/apt/incoming/${CODENAME}-stable; done
     dependencies:
-        - xenial-tag-colab
-        - bionic-tag-colab
+        - xenial-tag
+        - bionic-tag
+        - focal-tag
     only:
         - /^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$/
     except:
