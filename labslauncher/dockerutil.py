@@ -193,12 +193,19 @@ class DockerClient():
         self._client = None
         self.total_size = None
         self.final_stats = None
+        self.last_failure = "Unknown error"
         self.last_failure_type = None
         self.is_running()  # sets up tag, status, and available
-        self.heartbeat = QTimer()
-        self.heartbeat.setInterval(1000*5)  # 5 seconds
-        self.heartbeat.start()
-        self.heartbeat.timeout.connect(self.is_running)
+        # docker service heartbeat
+        self.dheartbeat = QTimer()
+        self.dheartbeat.setInterval(1000*5)  # 5 seconds
+        self.dheartbeat.start()
+        self.dheartbeat.timeout.connect(self.is_running)
+        # container status heartbeat
+        self.cheartbeat = QTimer()
+        self.cheartbeat.setInterval(1000*5)  # 5 seconds
+        self.cheartbeat.start()
+        self.cheartbeat.timeout.connect(self.set_status)
 
     @property
     def docker(self):
@@ -427,3 +434,19 @@ class DockerClient():
             c = self.container
             new = "inactive" if c is None else c.status
         self.status.value = (self.status.value[1], new)
+        self.logger.info("status: {}".format(self.status.value))
+
+    def container_logs(self, stream=False):
+        """Return container logs (or None)."""
+        if self._available.value:
+            c = self.container
+        if c is not None:
+            if stream:
+                return (
+                    item.decode()
+                    for item in self.container.logs(stream=stream))
+            else:
+                return self.container.logs().decode()
+        else:
+            self.logger.warning("Cannot fetch logs without container.")
+            return None

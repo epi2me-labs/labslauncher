@@ -41,6 +41,11 @@ class Screen(QWidget):
             p = p.parent()
         return p
 
+    @property
+    def logger(self):
+        """Return the applications logger."""
+        return self.app.logger
+
 
 class HomeScreen(Screen):
     """The application home screen."""
@@ -186,7 +191,6 @@ class StartScreen(Screen):
     def __init__(self, parent=None):
         """Initialize the screen."""
         super().__init__(parent=parent)
-        self.logger = self.app.logger
         self.token_policy = PasswordPolicy.from_names(
             length=8, uppercase=1, numbers=1)
         self.onlyInt = QIntValidator()
@@ -329,27 +333,6 @@ class StartScreen(Screen):
 
         if self.app.docker.status.value[1] != "running":
             self.logger.error("Failed to start container.")
-            msg = QMessageBox(self)
-            msg.setIcon(QMessageBox.Critical)
-            msg.setText("Server start error")
-            msg.setWindowTitle("Server Error")
-            if self.app.docker.last_failure_type == "file_share":
-                msg.setInformativeText(
-                    "Cannot share data path with server. "
-                    "Please check sharing has been enabled in docker.")
-                msg.setDetailedText(
-                    "The path {} is not shared with Docker. You can "
-                    "configure shared paths from Docker > Settings "
-                    "> Resources > Filesharing. The path specified "
-                    "in Docker should either be the same as or "
-                    "contain the path you specify in this "
-                    "application.".format(mount))
-            else:
-                msg.setInformativeText(
-                    "An unexpected error occurred starting the server.")
-                msg.setDetailedText(self.app.docker.last_failure)
-                self.logger.error(self.app.docker.last_failure)
-            msg.exec_()
         else:
             self.logger.info("Container started, writing config to mount.")
             config = configparser.ConfigParser()
@@ -698,6 +681,42 @@ class LabsLauncher(QMainWindow):
             msg.setInformativeText(
                 "Connection to docker established.")
             msg.exec_()
+        elif new == "exited" and not boot:
+            self.display_error_dialog()
+
+    def display_error_dialog(self):
+        """Display a dialog detailing the last server error.
+
+        .. note:: It is assumed an error has indeed been encountered.
+        """
+        msg = QMessageBox(self)
+        msg.setIcon(QMessageBox.Critical)
+        msg.setText("Notebook server error")
+        msg.setWindowTitle("Server Error")
+        if self.docker.last_failure_type == "file_share":
+            msg.setInformativeText(
+                "Cannot share data path with server. "
+                "Please check sharing has been enabled in docker.")
+            msg.setDetailedText(
+                "The path {} is not shared with Docker. You can "
+                "configure shared paths from Docker > Settings "
+                "> Resources > Filesharing. The path specified "
+                "in Docker should either be the same as or "
+                "contain the path you specify in this "
+                "application.".format(self.settings["data_mount"]))
+        else:
+            msg.setInformativeText(
+                "An unexpected error occurred in the notebook server.")
+            logs = self.docker.container_logs()
+            if logs is None:
+                logs = "Unknown error."
+            self.logger.error(
+                "\n"
+                "<<<Start Container logs:\n"
+                "{}\n"
+                "<<<End Container logs.".format(logs))
+            msg.setDetailedText(logs)
+        msg.exec_()
 
     def moveEvent(self, event):
         """Move the progress dialog when main window moves."""
