@@ -10,21 +10,20 @@ test:
         - linux
     before_script:
         - export DEBIAN_FRONTEND=noninteractive
-        - apt-get update -qq && apt-get install -y -qq
-          python-virtualenv python3-dev
+        - apt-get update -qq && apt-get install -y -qq python3-dev
+        - wget https://bootstrap.pypa.io/get-pip.py
+        - python3 ./get-pip.py
+        - pip install virtualenv
     script:
         - PYTHON=python3 make test
 
 ###
 # Windows
 #
-.build-win: &build-win
+windows-package:
     stage: build
     tags:
         - epi2melabs-win
-
-build-win-colab:
-    <<: *build-win
     variables:
         NOCOLAB: 0
     script:
@@ -36,15 +35,12 @@ build-win-colab:
 
 ###
 # macos
-# #
-.build-macos: &build-macos
+#
+macos-package:
     stage: build
     tags:
         - macos
         - oxford
-
-build-macos-colab:
-    <<: *build-macos
     variables:
         NOCOLAB: 0
     script:
@@ -65,9 +61,12 @@ build-macos-colab:
     script:
         - export DEBIAN_FRONTEND=noninteractive
         - apt-get update -qq && apt-get install -y -qq
-          build-essential wget fakeroot rsync ssh python-virtualenv python3-dev
+          build-essential wget fakeroot rsync ssh python3-dev
           xvfb libx11-xcb1 libxext6 libxrender1 libxcb-xinerama0
           libsm6 libice6 libglib2.0-0
+        - wget https://bootstrap.pypa.io/get-pip.py
+        - python3 ./get-pip.py
+        - pip install virtualenv
         - PYTHON=python3 make deb
         - dpkg -I ont-epi2melabs-launcher*.deb
     artifacts:
@@ -93,30 +92,41 @@ build-macos-colab:
     except:
         - branches
 
-.xenial-colab: &xenial-colab
+.xenial: &xenial
     <<: *build-ubuntu
     variables:
         IMAGEUSED: ${IMAGE}:16.04
         NOCOLAB: 0
 
-.bionic-colab: &bionic-colab
+.bionic: &bionic
     <<: *build-ubuntu
     variables:
         IMAGEUSED: ${IMAGE}:18.04
         NOCOLAB: 0
 
+.focal: &focal
+    <<: *build-ubuntu
+    variables:
+        IMAGEUSED: ${IMAGE}:20.04
+        NOCOLAB: 0
+
 # branches
-xenial-deb-colab:
-    <<: *xenial-colab
-bionic-deb-colab:
-    <<: *bionic-colab
+xenial-deb:
+    <<: *xenial
+bionic-deb:
+    <<: *bionic
+focal-deb:
+    <<: *focal
 
 # tags
-xenial-tag-colab:
-    <<: *xenial-colab
+xenial-tag:
+    <<: *xenial
     <<: *tag-package-check
-bionic-tag-colab:
-    <<: *bionic-colab
+bionic-tag:
+    <<: *bionic
+    <<: *tag-package-check
+focal-tag:
+    <<: *focal
     <<: *tag-package-check
 
 ###
@@ -225,7 +235,7 @@ push-debs:
     <<: *setup-deb-push
     stage: push
     script:
-        - for CODENAME in xenial bionic; do scp -o StrictHostKeyChecking=no *${CODENAME}.deb ${DEBREPO}:/var/www/apt/${CODENAME}-stable; done
+        - for CODENAME in xenial bionic focal; do scp -o StrictHostKeyChecking=no *${CODENAME}.deb ${DEBREPO}:/var/www/apt/${CODENAME}-stable; done
     only:
         - /^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$/
     except:
@@ -235,10 +245,11 @@ push-external:
     <<: *setup-deb-push
     stage: push
     script:
-        - for CODENAME in xenial bionic; do scp -o StrictHostKeyChecking=no *${CODENAME}.deb ${EXTERNALDEBREPO}:/mirror/apt/incoming/${CODENAME}-stable; done
+        - for CODENAME in xenial bionic focal; do scp -o StrictHostKeyChecking=no *${CODENAME}.deb ${EXTERNALDEBREPO}:/mirror/apt/incoming/${CODENAME}-stable; done
     dependencies:
-        - xenial-tag-colab
-        - bionic-tag-colab
+        - xenial-tag
+        - bionic-tag
+        - focal-tag
     only:
         - /^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$/
     except:
