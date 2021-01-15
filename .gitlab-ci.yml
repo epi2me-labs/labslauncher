@@ -48,11 +48,11 @@ build-macos-colab:
     variables:
         NOCOLAB: 0
     script:
-        - PYTHON=$(PYENV_VERSION=3.6.11 pyenv which python) make build
-        - cd dist; zip -r ../ont-epi2melabs-launcher-${CI_COMMIT_REF_NAME}-macos.app.zip EPI2ME-Labs-Launcher.app
+        - PYTHON=$(PYENV_VERSION=3.6.11 pyenv which python) make dmg
+        - mv dist/EPI2ME-Labs-Launcher.dmg dist/ont-epi2melabs-launcher-${CI_COMMIT_REF_NAME}-macos.dmg
     artifacts:
         paths:
-            - "ont-epi2melabs-launcher-${CI_COMMIT_REF_NAME}-macos.app.zip"
+            - "dist/ont-epi2melabs-launcher-${CI_COMMIT_REF_NAME}-macos.dmg"
 
 ###
 # Ubuntu
@@ -182,7 +182,7 @@ bundle:
         paths:
             - "ont-epi2melabs-installer-*-win10.exe"
             - "ont-epi2melabs-launcher-*.deb"
-            - "ont-epi2melabs-launcher-*-macos.app.zip"
+            - "ont-epi2melabs-launcher-*-macos.dmg"
             - "ont-epi2melabs-launcher-*.x86_64.rpm"
 
 
@@ -210,7 +210,7 @@ push-github:
         - git clone https://github.com/epi2me-labs/github_release
         - pip3 install -r github_release/requirements.txt
         - github_release/make_release ${CI_PROJECT_NAME} ${CI_COMMIT_TAG} CHANGELOG.md ${LABS_BOT_GH_TOKEN}
-          --artifacts ont-epi2melabs-installer-*-win10.exe ont-epi2melabs-launcher-*.deb ont-epi2melabs-launcher-*-macos.app.zip
+          --artifacts ont-epi2melabs-installer-*-win10.exe ont-epi2melabs-launcher-*.deb ont-epi2melabs-launcher-*-macos.dmg ont-epi2melabs-launcher-*.x86_64.rpm
     only:
         - tags
 

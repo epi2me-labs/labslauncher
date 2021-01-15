@@ -76,6 +76,11 @@ clean:
 	rm -rf __pycache__ dist build venv labslauncher.egg-info tmp *.deb
 
 
+dmg: dist/EPI2ME-Labs-Launcher
+	${IN_VENV} && pip install dmgbuild biplist
+	${IN_VENV} && dmgbuild -s macos-src/dmgbuild.settings.py -D app=dist/EPI2ME-Labs-Launcher.app "EPI2ME-Labs-Launcher" dist/EPI2ME-Labs-Launcher.dmg
+
+
 deb: clean dist/EPI2ME-Labs-Launcher
 	# To make a deb package, we simply copy all files from the pyinstaller bundle
 	# Note the postrm script removes everything under /usr/local/bin/EPI2ME-Labs-Launcher
