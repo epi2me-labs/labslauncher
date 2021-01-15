@@ -45,10 +45,10 @@ macos-package:
         NOCOLAB: 0
     script:
         - PYTHON=$(PYENV_VERSION=3.6.11 pyenv which python) make dmg
-        - mv dist/EPI2ME-Labs-Launcher.dmg dist/ont-epi2melabs-launcher-${CI_COMMIT_REF_NAME}-macos.dmg
+        - mv dist/EPI2ME-Labs-Launcher.dmg ont-epi2melabs-launcher-${CI_COMMIT_REF_NAME}-macos.dmg
     artifacts:
         paths:
-            - "dist/ont-epi2melabs-launcher-${CI_COMMIT_REF_NAME}-macos.dmg"
+            - "ont-epi2melabs-launcher-${CI_COMMIT_REF_NAME}-macos.dmg"
 
 ###
 # Ubuntu
