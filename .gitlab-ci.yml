@@ -76,17 +76,17 @@ build-macos-colab:
     except:
         - tags
 
-.setup-tag: &tag
+.setup-tag: &tag-package-check
     before_script:
         - IFS='.' read -ra PARTS <<< "${CI_COMMIT_TAG}"
         - export MAJOR=${PARTS[0]:1}
         - export MINOR=${PARTS[1]}
         - export SUB=${PARTS[2]}
-        - export DEBVER="$MAJOR.$MINOR.$SUB"
+        - export PACKVER="$MAJOR.$MINOR.$SUB"
         # check the version in the python package matches the tag
         - PYVER=$(grep "__version__ = " labslauncher/__init__.py | awk '{gsub("\"","",$3); print $3}')
-        - echo "DEBVER='$DEBVER'   PYVER='$PYVER'"
-        - if [[ "$PYVER" != "$DEBVER" ]]; then echo "Mismatching TAG and PACKAGE versions"; exit 1; else echo "TAG and PACKAGE versions agree."; fi
+        - echo "PACKVER='$PACKVER'   PYVER='$PYVER'"
+        - if [[ "$PYVER" != "$PACKVER" ]]; then echo "Mismatching TAG and PACKAGE versions"; exit 1; else echo "TAG and PACKAGE versions agree."; fi
         - echo -e "\e[1m\e[34mTagging with '\e[35m$MAJOR.$MINOR.$SUB\e[34m'\e[0m"
     only:
         - /^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$/
@@ -114,10 +114,60 @@ bionic-deb-colab:
 # tags
 xenial-tag-colab:
     <<: *xenial-colab
-    <<: *tag
+    <<: *tag-package-check
 bionic-tag-colab:
     <<: *bionic-colab
-    <<: *tag
+    <<: *tag-package-check
+
+###
+# Centos
+#
+.build-centos: &build-centos
+    image: ${IMAGEUSED}
+    stage: build
+    tags:
+        - linux
+    script:
+        - yum install -y python3 wget make mesa-libGL
+          fontconfig freetype freetype-devel fontconfig-devel libstdc++ 
+          xcb-util-wm xcb-util-image xcb-util-renderutil libxkbcommon libxkbcommon-x11
+          rpm-build rpm-devel rpmdevtools chrpath 
+        - wget https://bootstrap.pypa.io/get-pip.py
+        - python3 ./get-pip.py
+        - pip install virtualenv
+        - PYTHON=python3 make rpm
+        - mv /root/rpmbuild/RPMS/x86_64/ont-epi2melabs-launcher*.rpm .
+    artifacts:
+        paths:
+            - "ont-epi2melabs-launcher*.rpm"
+    except:
+        - tags
+
+.centos7: &centos7
+    <<: *build-centos
+    variables:
+        IMAGEUSED: centos:centos7
+        NOCOLAB: 0
+
+.centos8: &centos8
+    <<: *build-centos
+    variables:
+        IMAGEUSED: centos:centos8
+        NOCOLAB: 0
+
+# branches
+centos7-rpm:
+    <<: *centos7
+centos8-rpm:
+    <<: *centos8
+
+# tags
+centos7-tag:
+    <<: *centos7
+    <<: *tag-package-check
+centos8-tag:
+    <<: *centos8
+    <<: *tag-package-check
 
 
 ###
@@ -133,6 +183,7 @@ bundle:
             - "ont-epi2melabs-installer-*-win10.exe"
             - "ont-epi2melabs-launcher-*.deb"
             - "ont-epi2melabs-launcher-*-macos.app.zip"
+            - "ont-epi2melabs-launcher-*.x86_64.rpm"
 
 
 push-github:
