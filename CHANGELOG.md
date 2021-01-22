@@ -4,17 +4,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.0.6] - 2021-01-22
+### Fixed
+ - Issue resulting in incorrect periodic change to home screen.
+
 ## [v1.0.5] - 2021-01-15
 ### Changed
  - macOS now packaged as a disk image (.dmg) installer.
 ### Added
  - Monitoring and logging of docker container in GUI.
- - Packages for CentOS 7 and CentOS RPMs
+ - Packages for CentOS 7 and CentOS RPMs.
 
 
 ## [v1.0.4] - 2021-01-06
 ### Fixed
- - Added extra libraries required on Ubuntu after Qt upgrade
+ - Added extra libraries required on Ubuntu after Qt upgrade.
 ### Added
  - Application update notification on start.
  - Changelog dialog to help menu.
@@ -23,37 +27,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
  - Updated pyqt5 and pyqt5-sip for compatibility with MacOS Big Sur.
 ### Removed
- - Colab support in container run command
- - Enablement of cross-site support in container run command
+ - Colab support in container run command.
+ - Enablement of cross-site support in container run command.
 
 ## [v1.0.2]
 ### Added
- - HTTP and FTP proxy settings
- - Pass proxy settings to container environment variables
+ - HTTP and FTP proxy settings.
+ - Pass proxy settings to container environment variables.
 
 ## [v1.0.1]
 ### Added
- - Ability to specify an https proxy
+ - Ability to specify an https proxy.
 ### Fixed
- - Application crash when running for a prolonged period after container stop
+ - Application crash when running for a prolonged period after container stop.
 
 ## [v1.0.0]
 ### Changed
- - Default docker image is now ontresearch/epi2melabs-notebook
+ - Default docker image is now ontresearch/epi2melabs-notebook.
 
 ## [v0.6.5]
 ### Changed
- - Blog URL for quickstart pages
+ - Blog URL for quickstart pages.
 
 ## [v0.6.4]
 ### Fixed
- - Correct URL for opening JupyterLab
+ - Correct URL for opening JupyterLab.
 
 ## [v0.6.3]
 ### Removed
- - Ability to change app behaviour for Colab
+ - Ability to change app behaviour for Colab.
 ### Changed
- - Help links now point to EPI2MELabs blog site
+ - Help links now point to EPI2MELabs blog site.
 
 ## [v0.6.2]
 ### Fixed

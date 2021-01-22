@@ -391,7 +391,7 @@ class StartScreen(Screen):
         elif new in ("created", "exited"):
             msg = " (last attempt failed)"
             start_text = "Restart"
-        elif new == "running":
+        elif new == "running" and old != "running":
             start_text = "Restart"
             self.app.show_home()
 
