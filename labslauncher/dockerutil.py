@@ -434,7 +434,8 @@ class DockerClient():
             c = self.container
             new = "inactive" if c is None else c.status
         self.status.value = (self.status.value[1], new)
-        self.logger.info("status: {}".format(self.status.value))
+        if self.status.value[0] != self.status.value[1]:
+            self.logger.info("status: {}".format(self.status.value))
 
     def container_logs(self, stream=False):
         """Return container logs (or None)."""
